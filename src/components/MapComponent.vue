@@ -3,7 +3,7 @@
 
   <!-- Кнопка режима -->
   <button class="mode-btn" :class="{ active: editMode }" @click="toggleMode">
-    {{ editMode ? 'Сейчас расставляем' : 'Сейчас смотрим' }}
+    {{ editMode ? '🏹 Расставляем' : '👁️ Смотрим' }}
   </button>
 
   <!-- Боковая панель -->
@@ -11,7 +11,7 @@
 
     <!-- Фильтры -->
     <div class="section">
-      <div class="section-title">ФИЛЬТР</div>
+      <div class="section-title">⚔️ ФИЛЬТР</div>
       <div class="filter-grid">
         <label
           v-for="type in markerTypes"
@@ -38,12 +38,12 @@
     <!-- Форма -->
     <template v-if="editMode">
       <div class="section">
-        <div class="section-title">НОВЫЙ МАРКЕР</div>
+        <div class="section-title">📍 НОВЫЙ МАРКЕР</div>
 
         <template v-if="pendingCoords">
           <div class="coords-line">{{ pendingCoords }}</div>
 
-          <div class="type-label">Тип</div>
+          <div class="type-label">Тип добычи</div>
           <div class="type-grid">
             <button
               v-for="type in markerTypes"
@@ -51,6 +51,7 @@
               class="type-btn"
               :class="{ selected: selectedType === type.id }"
               @click="selectedType = type.id"
+              :title="type.name"
             >
               <img :src="type.icon" :alt="type.name" />
             </button>
@@ -58,29 +59,29 @@
 
           <input
             v-model="formTitle"
-            placeholder="Название"
+            placeholder="Название места"
             ref="titleInput"
             @keyup.enter="saveMarker"
           />
           <input
             v-model="formDescription"
-            placeholder="Описание"
+            placeholder="Что здесь водится..."
             @keyup.enter="saveMarker"
           />
           <div class="form-btns">
-            <button class="btn-add" @click="saveMarker">СКОПИРОВАТЬ</button>
+            <button class="btn-add" @click="saveMarker">🏹 СКОПИРОВАТЬ</button>
             <button class="btn-cancel" @click="cancelMarker">ОТМЕНА</button>
           </div>
         </template>
 
         <template v-else>
-          <div class="hint">Кликните по карте, чтобы поставить маркер</div>
+          <div class="hint">Кликните по карте, чтобы отметить место</div>
         </template>
       </div>
 
       <!-- Список -->
       <div class="section" v-if="placedMarkers.length > 0">
-        <div class="section-title">РАЗМЕЩЕНО ({{ placedMarkers.length }})</div>
+        <div class="section-title">🗡️ РАЗМЕЩЕНО ({{ placedMarkers.length }})</div>
         <div class="marker-list">
           <div class="marker-item" v-for="(m, i) in placedMarkers" :key="i">
             <img :src="getTypeIcon(m.type)" class="marker-item-icon" />
@@ -96,6 +97,7 @@
 
       <!-- Подсказка -->
       <div class="panel-footer">
+        <div class="footer-ornament">— ◆ —</div>
         Скопированное отправьте<br>
         <strong>Намо гро-Аденну</strong><br>
         в Discord:<br>
@@ -118,8 +120,6 @@ import { onMounted, ref, nextTick } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// =====================================================
-// BASE URL — автоматически /sky-map/ на GitHub, / локально
 const BASE = import.meta.env.BASE_URL;
 
 // =====================================================
@@ -134,7 +134,7 @@ const markerTypes = [
 // =====================================================
 
 // =====================================================
-// ПОСТОЯННЫЕ МАРКЕРЫ — вставляй сюда скопированное
+// ПОСТОЯННЫЕ МАРКЕРЫ
 const markers = [
   {
     coords: [500, 900],
@@ -167,11 +167,16 @@ function getTypeIcon(typeId) {
 }
 
 function createLeafletIcon(typeId) {
-  return L.icon({
-    iconUrl: getTypeIcon(typeId),
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32],
+  const iconUrl = getTypeIcon(typeId);
+  return L.divIcon({
+    className: '',
+    html: `
+      <div class="map-marker">
+        <img src="${iconUrl}" alt="" />
+      </div>
+    `,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
   });
 }
 
@@ -203,7 +208,7 @@ async function saveMarker() {
     .addTo(mapInstance)
     .bindTooltip(createTooltipContent(title, description), {
       direction: 'top',
-      offset: [0, -32],
+      offset: [0, -20],
       className: 'custom-tooltip',
     });
 
@@ -239,7 +244,7 @@ function removeMarker(i) {
   mapInstance.removeLayer(tempLeafletMarkers[i].marker);
   tempLeafletMarkers.splice(i, 1);
   placedMarkers.value.splice(i, 1);
-  toast(`Удалено: ${removed.title}`);
+  toast(`🗑️ ${removed.title}`);
 }
 
 function clearAll() {
@@ -311,7 +316,7 @@ onMounted(() => {
         .addTo(map)
         .bindTooltip(createTooltipContent(m.title, m.description), {
           direction: 'top',
-          offset: [0, -32],
+          offset: [0, -20],
           className: 'custom-tooltip',
         });
 
@@ -334,6 +339,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&display=swap');
+
 .leaflet-map {
   width: 100vw;
   height: 100vh;
@@ -348,19 +355,23 @@ onMounted(() => {
   top: 16px;
   right: 16px;
   z-index: 1000;
-  padding: 8px 16px;
-  background: #e8e8e8;
-  color: #111;
-  border: 2px solid #999;
-  font: bold 11px/1 'Courier New', monospace;
-  letter-spacing: 2px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #5c4a3a, #3e2f23);
+  color: #e8dcc8;
+  border: 2px solid #8b7355;
+  font: bold 12px/1 'Cinzel', serif;
+  letter-spacing: 1px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.mode-btn:hover {
+  background: linear-gradient(135deg, #6d5a48, #4e3d2f);
 }
 .mode-btn.active {
-  background: #111;
-  color: #e8e8e8;
-  border-color: #111;
+  background: linear-gradient(135deg, #8b2500, #6b1c00);
+  border-color: #c4713b;
+  color: #ffeedd;
 }
 
 /* ── Панель ── */
@@ -371,47 +382,67 @@ onMounted(() => {
   z-index: 999;
   width: 280px;
   height: 100vh;
-  background: #e8e8e8;
-  color: #111;
-  border-left: 2px solid #999;
-  padding: 60px 16px 16px;
+  background: linear-gradient(180deg, #f5efe6, #e8dcc8, #ddd0b8);
+  color: #3e2f23;
+  border-left: 3px solid #8b7355;
+  padding: 16px 16px 16px;
   overflow-y: auto;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
+  font-family: 'Crimson Text', serif;
+  font-size: 14px;
   display: flex;
   flex-direction: column;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.15);
 }
 .panel-view {
   width: 220px;
 }
 
+/* ── Заголовок панели ── */
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid #8b7355;
+}
+.panel-logo {
+  font-size: 22px;
+}
+.panel-title {
+  font: bold 16px 'Cinzel', serif;
+  color: #3e2f23;
+  letter-spacing: 2px;
+}
+
 .section {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .section-title {
-  font-size: 10px;
+  font: bold 11px 'Cinzel', serif;
   letter-spacing: 3px;
-  color: #555;
-  border-bottom: 1px solid #bbb;
+  color: #6d5a48;
+  border-bottom: 1px solid #c4a87a;
   padding-bottom: 6px;
   margin-bottom: 10px;
 }
 
 .hint {
-  color: #888;
+  color: #8b7355;
   font-style: italic;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .coords-line {
-  background: #d4d4d4;
-  border: 1px solid #bbb;
+  background: rgba(139, 115, 85, 0.15);
+  border: 1px solid #c4a87a;
   padding: 6px 10px;
   margin-bottom: 8px;
   font-family: 'Courier New', monospace;
-  color: #111;
+  color: #3e2f23;
   font-size: 12px;
+  border-radius: 4px;
 }
 
 /* ── Фильтры ── */
@@ -426,29 +457,29 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  background: transparent;
-  border: 1px solid #bbb;
+  background: rgba(139, 115, 85, 0.08);
+  border: 1px solid #c4a87a;
+  border-radius: 4px;
   cursor: pointer;
-  transition: all 0.15s;
-  opacity: 0.5;
+  transition: all 0.2s;
+  opacity: 0.45;
 }
 .filter-item.active {
-  background: #d4d4d4;
-  border-color: #999;
+  background: rgba(139, 115, 85, 0.25);
+  border-color: #8b7355;
   opacity: 1;
+  box-shadow: inset 0 0 8px rgba(139, 115, 85, 0.15);
 }
-.filter-item input {
-  display: none;
-}
+.filter-item input { display: none; }
 .filter-item img {
   width: 20px;
   height: 20px;
   object-fit: contain;
 }
 .filter-item span {
-  font-size: 10px;
+  font: 11px 'Cinzel', serif;
   letter-spacing: 1px;
-  color: #111;
+  color: #3e2f23;
 }
 .filter-btns {
   display: flex;
@@ -457,22 +488,24 @@ onMounted(() => {
 .filter-btns button {
   flex: 1;
   padding: 6px;
-  background: transparent;
-  color: #888;
-  border: 1px solid #bbb;
-  font: bold 9px/1 'Courier New', monospace;
+  background: rgba(139, 115, 85, 0.1);
+  color: #6d5a48;
+  border: 1px solid #c4a87a;
+  border-radius: 4px;
+  font: bold 9px 'Cinzel', serif;
   letter-spacing: 2px;
   cursor: pointer;
+  transition: all 0.15s;
 }
 .filter-btns button:hover {
-  border-color: #555;
-  color: #333;
+  background: rgba(139, 115, 85, 0.25);
+  border-color: #8b7355;
 }
 
 /* ── Выбор типа ── */
 .type-label {
-  font-size: 10px;
-  color: #555;
+  font: 11px 'Cinzel', serif;
+  color: #6d5a48;
   letter-spacing: 2px;
   margin-bottom: 6px;
 }
@@ -485,14 +518,15 @@ onMounted(() => {
 .type-btn {
   width: 44px;
   height: 44px;
-  background: transparent;
-  border: 2px solid #bbb;
+  background: rgba(139, 115, 85, 0.08);
+  border: 2px solid #c4a87a;
+  border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
-  opacity: 0.5;
+  transition: all 0.2s;
+  opacity: 0.45;
 }
 .type-btn img {
   width: 28px;
@@ -500,63 +534,71 @@ onMounted(() => {
   object-fit: contain;
 }
 .type-btn.selected {
-  background: #d4d4d4;
-  border-color: #555;
+  background: rgba(139, 115, 85, 0.3);
+  border-color: #6d5a48;
   opacity: 1;
+  box-shadow: 0 0 8px rgba(139, 115, 85, 0.3);
 }
 
 /* ── Инпуты ── */
 .panel input {
   width: 100%;
   padding: 8px 10px;
-  background: #f5f5f5;
-  color: #111;
-  border: 1px solid #bbb;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  color: #3e2f23;
+  border: 1px solid #c4a87a;
+  border-radius: 4px;
+  font: 13px 'Crimson Text', serif;
   margin-bottom: 6px;
   outline: none;
   box-sizing: border-box;
+  transition: border-color 0.15s;
 }
 .panel input:focus {
-  border-color: #111;
+  border-color: #6d5a48;
+  background: rgba(255, 255, 255, 0.85);
 }
 .panel input::placeholder {
-  color: #aaa;
+  color: #a99880;
+  font-style: italic;
 }
 
 /* ── Кнопки формы ── */
 .form-btns {
   display: flex;
   gap: 6px;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 .btn-add {
   flex: 1;
-  padding: 8px;
-  background: #111;
-  color: #e8e8e8;
+  padding: 9px;
+  background: linear-gradient(135deg, #8b2500, #6b1c00);
+  color: #ffeedd;
   border: none;
-  font: bold 10px/1 'Courier New', monospace;
-  letter-spacing: 2px;
+  border-radius: 4px;
+  font: bold 11px 'Cinzel', serif;
+  letter-spacing: 1px;
   cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 2px 6px rgba(139, 37, 0, 0.3);
 }
 .btn-add:hover {
-  background: #333;
+  background: linear-gradient(135deg, #a03000, #7d2200);
 }
 .btn-cancel {
   flex: 1;
-  padding: 8px;
+  padding: 9px;
   background: transparent;
-  color: #888;
-  border: 1px solid #bbb;
-  font: bold 10px/1 'Courier New', monospace;
-  letter-spacing: 2px;
+  color: #8b7355;
+  border: 1px solid #c4a87a;
+  border-radius: 4px;
+  font: bold 11px 'Cinzel', serif;
+  letter-spacing: 1px;
   cursor: pointer;
 }
 .btn-cancel:hover {
-  border-color: #555;
-  color: #333;
+  border-color: #6d5a48;
+  color: #3e2f23;
 }
 
 /* ── Список маркеров ── */
@@ -571,75 +613,84 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  background: #d4d4d4;
-  border: 1px solid #bbb;
+  background: rgba(139, 115, 85, 0.15);
+  border: 1px solid #c4a87a;
+  border-radius: 4px;
 }
 .marker-item-icon {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   object-fit: contain;
 }
 .marker-info {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 .marker-name {
-  color: #111;
-  font-size: 11px;
-  font-weight: bold;
+  color: #3e2f23;
+  font: bold 12px 'Crimson Text', serif;
 }
 .marker-coords {
-  color: #777;
-  font-size: 10px;
+  color: #8b7355;
+  font: 10px 'Courier New', monospace;
 }
 .btn-remove {
   background: none;
   border: none;
-  color: #999;
+  color: #a99880;
   font-size: 12px;
   cursor: pointer;
   padding: 2px 6px;
 }
 .btn-remove:hover {
-  color: #111;
+  color: #8b2500;
 }
 
 .btn-outline {
   width: 100%;
   padding: 8px;
   background: transparent;
-  color: #888;
-  border: 1px solid #bbb;
-  font: bold 10px/1 'Courier New', monospace;
+  color: #8b7355;
+  border: 1px solid #c4a87a;
+  border-radius: 4px;
+  font: bold 10px 'Cinzel', serif;
   letter-spacing: 2px;
   cursor: pointer;
 }
 .btn-outline:hover {
-  border-color: #555;
-  color: #333;
+  border-color: #6d5a48;
+  color: #3e2f23;
 }
 
 /* ── Подсказка внизу ── */
 .panel-footer {
   margin-top: auto;
-  padding-top: 16px;
-  border-top: 1px solid #bbb;
-  font-size: 11px;
-  color: #777;
+  padding-top: 14px;
+  border-top: 2px solid #8b7355;
+  font-size: 12px;
+  color: #6d5a48;
   line-height: 1.7;
+  text-align: center;
+}
+.footer-ornament {
+  color: #c4a87a;
+  font-size: 14px;
+  margin-bottom: 8px;
+  letter-spacing: 6px;
 }
 .panel-footer strong {
-  color: #111;
+  color: #3e2f23;
 }
 .panel-footer a {
-  color: #111;
-  text-decoration: underline;
+  color: #8b2500;
+  text-decoration: none;
   font-weight: bold;
+  border-bottom: 1px dashed #8b2500;
 }
 .panel-footer a:hover {
-  color: #555;
+  color: #a03000;
 }
 
 /* ── Тост ── */
@@ -649,38 +700,70 @@ onMounted(() => {
   left: 50%;
   transform: translateX(-50%);
   z-index: 2000;
-  background: #111;
-  color: #e8e8e8;
-  padding: 8px 20px;
-  font: bold 11px/1 'Courier New', monospace;
-  letter-spacing: 2px;
+  background: linear-gradient(135deg, #5c4a3a, #3e2f23);
+  color: #e8dcc8;
+  padding: 10px 24px;
+  font: bold 12px 'Cinzel', serif;
+  letter-spacing: 1px;
+  border: 1px solid #8b7355;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to       { opacity: 0; }
 </style>
 
 <style>
-/* ── Tooltip при наведении на маркер ── */
+/* ── Маркер на карте — красный кружок с иконкой ── */
+.map-marker {
+  width: 36px;
+  height: 36px;
+  background: radial-gradient(circle, #c0392b, #8b2500);
+  border: 3px solid #e8dcc8;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 2px 8px rgba(139, 37, 0, 0.5),
+    0 0 0 2px rgba(139, 37, 0, 0.3);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.map-marker:hover {
+  transform: scale(1.2);
+}
+.map-marker img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  filter: brightness(10);
+}
+
+/* ── Tooltip ── */
 .custom-tooltip {
-  background: #111;
-  color: #e8e8e8;
-  border: none;
-  border-radius: 0;
-  padding: 8px 12px;
-  font-family: 'Courier New', monospace;
-  font-size: 11px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #5c4a3a, #3e2f23);
+  color: #e8dcc8;
+  border: 1px solid #8b7355;
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-family: 'Crimson Text', serif;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 .custom-tooltip b {
   display: block;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
   letter-spacing: 1px;
+  color: #ffeedd;
 }
 .custom-tooltip span {
-  color: #aaa;
-  font-size: 10px;
+  color: #c4a87a;
+  font-size: 12px;
+  font-style: italic;
 }
 .leaflet-tooltip-top:before {
-  border-top-color: #111;
+  border-top-color: #3e2f23;
 }
 </style>
