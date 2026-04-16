@@ -1,13 +1,19 @@
 <template>
   <div id="map" class="leaflet-map"></div>
 
-  <!-- Кнопка режима -->
+  <!-- Кнопка — левый верхний угол -->
   <button class="mode-btn" :class="{ active: editMode }" @click="toggleMode">
     {{ editMode ? '🏹 Расставляем' : '👁️ Смотрим' }}
   </button>
 
   <!-- Боковая панель -->
   <div class="panel" :class="{ 'panel-view': !editMode }">
+
+    <!-- Заголовок -->
+    <div class="panel-header">
+      <span class="panel-logo">🗺️</span>
+      <span class="panel-title">Карта дичи</span>
+    </div>
 
     <!-- Фильтры -->
     <div class="section">
@@ -125,16 +131,19 @@ const BASE = import.meta.env.BASE_URL;
 // =====================================================
 // ТИПЫ МАРКЕРОВ
 const markerTypes = [
-  { id: 'elk',   name: 'Олень',   icon: BASE + 'elk.png' },
-  { id: 'wolf',  name: 'Волк',    icon: BASE + 'wolf.png' },
-  { id: 'rat',   name: 'Крыса',   icon: BASE + 'rat.png' },
-  { id: 'bear',  name: 'Медведь', icon: BASE + 'bear.png' },
-  { id: 'troll', name: 'Тролль',  icon: BASE + 'troll.png' },
+  { id: 'elk',        name: 'Олень',    icon: BASE + 'elk.png' },
+  { id: 'wolf',       name: 'Волк',     icon: BASE + 'wolf.png' },
+  { id: 'rat',        name: 'Крыса',    icon: BASE + 'rat.png' },
+  { id: 'bear',       name: 'Медведь',  icon: BASE + 'bear.png' },
+  { id: 'troll',      name: 'Тролль',   icon: BASE + 'troll.png' },
+  { id: 'sabertooth', name: 'Саблезуб', icon: BASE + 'cat.png' },
+  // { id: 'mammoth', name: 'Мамонт',  icon: BASE + 'mammoth.png' },
+  // { id: 'giant',   name: 'Великан', icon: BASE + 'giant.png' },
 ];
 // =====================================================
 
 // =====================================================
-// ПОСТОЯННЫЕ МАРКЕРЫ
+// ПОСТОЯННЫЕ МАРКЕРЫ — вставляй сюда скопированное
 const markers = [
   {
     coords: [500, 900],
@@ -349,21 +358,22 @@ onMounted(() => {
   left: 0;
 }
 
-/* ── Кнопка режима ── */
+/* ── Кнопка режима — левый верхний угол ── */
 .mode-btn {
   position: fixed;
   top: 16px;
-  right: 16px;
+  left: 16px;
   z-index: 1000;
-  padding: 10px 20px;
+  padding: 10px 18px;
   background: linear-gradient(135deg, #5c4a3a, #3e2f23);
   color: #e8dcc8;
   border: 2px solid #8b7355;
-  font: bold 12px/1 'Cinzel', serif;
+  border-radius: 4px;
+  font: bold 12px 'Cinzel', serif;
   letter-spacing: 1px;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 .mode-btn:hover {
   background: linear-gradient(135deg, #6d5a48, #4e3d2f);
@@ -391,7 +401,7 @@ onMounted(() => {
   font-size: 14px;
   display: flex;
   flex-direction: column;
-  box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
 }
 .panel-view {
   width: 220px;
@@ -706,14 +716,14 @@ onMounted(() => {
   font: bold 12px 'Cinzel', serif;
   letter-spacing: 1px;
   border: 1px solid #8b7355;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to       { opacity: 0; }
 </style>
 
 <style>
-/* ── Маркер на карте — красный кружок с иконкой ── */
+/* ── Маркер на карте ── */
 .map-marker {
   width: 36px;
   height: 36px;
@@ -748,7 +758,7 @@ onMounted(() => {
   padding: 8px 14px;
   font-family: 'Crimson Text', serif;
   font-size: 13px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 .custom-tooltip b {
   display: block;
