@@ -3,7 +3,7 @@
 
   <!-- Кнопка режима -->
   <button class="mode-btn" :class="{ active: editMode }" @click="toggleMode">
-    {{ editMode ? 'Сейчас расставляем' : 'Сейчас смотрим'    }}
+    {{ editMode ? 'Сейчас расставляем' : 'Сейчас смотрим' }}
   </button>
 
   <!-- Боковая панель -->
@@ -119,18 +119,22 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // =====================================================
+// BASE URL — автоматически /sky-map/ на GitHub, / локально
+const BASE = import.meta.env.BASE_URL;
+
+// =====================================================
 // ТИПЫ МАРКЕРОВ
 const markerTypes = [
-  { id: 'elk',   name: 'Олень',   icon: '/elk.png' },
-  { id: 'wolf',  name: 'Волк',    icon: '/wolf.png' },
-  { id: 'rat',   name: 'Крыса',   icon: '/rat.png' },
-  { id: 'bear',  name: 'Медведь', icon: '/bear.png' },
-  { id: 'troll', name: 'Тролль',  icon: '/troll.png' },
+  { id: 'elk',   name: 'Олень',   icon: BASE + 'elk.png' },
+  { id: 'wolf',  name: 'Волк',    icon: BASE + 'wolf.png' },
+  { id: 'rat',   name: 'Крыса',   icon: BASE + 'rat.png' },
+  { id: 'bear',  name: 'Медведь', icon: BASE + 'bear.png' },
+  { id: 'troll', name: 'Тролль',  icon: BASE + 'troll.png' },
 ];
 // =====================================================
 
 // =====================================================
-// ПОСТОЯННЫЕ МАРКЕРЫ
+// ПОСТОЯННЫЕ МАРКЕРЫ — вставляй сюда скопированное
 const markers = [
   {
     coords: [500, 900],
@@ -151,15 +155,15 @@ const toastMsg        = ref('');
 
 const activeFilters = ref(markerTypes.map(t => t.id));
 
-let pendingLatLng     = null;
-let mapInstance       = null;
+let pendingLatLng          = null;
+let mapInstance            = null;
 
-const placedMarkers      = ref([]);
-const tempLeafletMarkers = [];
+const placedMarkers           = ref([]);
+const tempLeafletMarkers      = [];
 const permanentLeafletMarkers = [];
 
 function getTypeIcon(typeId) {
-  return markerTypes.find(t => t.id === typeId)?.icon || '/markers/elk.png';
+  return markerTypes.find(t => t.id === typeId)?.icon || BASE + 'elk.png';
 }
 
 function createLeafletIcon(typeId) {
@@ -169,6 +173,13 @@ function createLeafletIcon(typeId) {
     iconAnchor: [16, 32],
     popupAnchor: [0, -32],
   });
+}
+
+function createTooltipContent(title, description) {
+  if (description) {
+    return `<b>${title}</b><br><span>${description}</span>`;
+  }
+  return `<b>${title}</b>`;
 }
 
 function toggleMode() {
@@ -214,13 +225,6 @@ async function saveMarker() {
   pendingLatLng         = null;
   formTitle.value       = '';
   formDescription.value = '';
-}
-
-function createTooltipContent(title, description) {
-  if (description) {
-    return `<b>${title}</b><br><span>${description}</span>`;
-  }
-  return `<b>${title}</b>`;
 }
 
 function cancelMarker() {
@@ -280,7 +284,7 @@ function toast(msg) {
 
 onMounted(() => {
   const img = new Image();
-  img.src = '/sky.jpg';
+  img.src = BASE + 'sky.jpg';
 
   img.onload = () => {
     const boundsH = 1000;
@@ -296,11 +300,10 @@ onMounted(() => {
     });
 
     mapInstance = map;
-    L.imageOverlay('/sky.jpg', imageBounds).addTo(map);
+    L.imageOverlay(BASE + 'sky.jpg', imageBounds).addTo(map);
     map.fitBounds(imageBounds);
     map.setMaxBounds(imageBounds);
 
-    // Постоянные маркеры с tooltip
     markers.forEach(m => {
       const lm = L.marker(m.coords, {
         icon: createLeafletIcon(m.type),
@@ -666,7 +669,7 @@ onMounted(() => {
   padding: 8px 12px;
   font-family: 'Courier New', monospace;
   font-size: 11px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 .custom-tooltip b {
   display: block;
