@@ -1,21 +1,16 @@
 <template>
   <div id="map" class="leaflet-map"></div>
 
-  <!-- Кнопка — левый верхний угол -->
   <button class="mode-btn" :class="{ active: editMode }" @click="toggleMode">
     {{ editMode ? '🏹 Расставляем' : '👁️ Смотрим' }}
   </button>
 
-  <!-- Боковая панель -->
   <div class="panel" :class="{ 'panel-view': !editMode }">
-
-    <!-- Заголовок -->
     <div class="panel-header">
       <span class="panel-logo">🗺️</span>
       <span class="panel-title">Карта дичи</span>
     </div>
 
-    <!-- Фильтры -->
     <div class="section">
       <div class="section-title">⚔️ ФИЛЬТР</div>
       <div class="filter-grid">
@@ -36,7 +31,6 @@
       </div>
     </div>
 
-    <!-- Форма добавления (только в режиме редактирования) -->
     <template v-if="editMode">
       <div class="section">
         <div class="section-title">📍 НОВЫЙ МАРКЕР</div>
@@ -80,7 +74,6 @@
         </template>
       </div>
 
-      <!-- Список всех маркеров (из таблицы) -->
       <div class="section" v-if="allMarkers.length > 0">
         <div class="section-title">🗡️ ВСЕ МАРКЕРЫ ({{ allMarkers.length }})</div>
         <div class="marker-list">
@@ -93,10 +86,8 @@
             <button class="btn-remove" @click="removeMarker(m.id)">✕</button>
           </div>
         </div>
-        <!-- Можно добавить кнопку массового удаления, но для простоты оставим только по одному -->
       </div>
 
-      <!-- Подсказка -->
       <div class="panel-footer">
         <div class="footer-ornament">— ◆ —</div>
         Данные синхронизируются с Google Таблицей<br>
@@ -107,10 +98,8 @@
         </a>
       </div>
     </template>
-
   </div>
 
-  <!-- Тост -->
   <transition name="fade">
     <div class="toast" v-if="toastMsg">{{ toastMsg }}</div>
   </transition>
@@ -122,10 +111,9 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const BASE = import.meta.env.BASE_URL;
-// ⚠️ ЗАМЕНИТЕ НА ВАШ URL ВЕБ-ПРИЛОЖЕНИЯ (из Google Apps Script)
-const WEB_APP_URL = 'https://script.googleusercontent.com/macros/echo?user_content_key=AWDtjMVxywLPM5rb0cDw0uewbK0_jZJI2es0polaHnb2si-1nRNzKeFTplCrXprPptl_v3OXOgCmporDMbVxqd8zaRXPaZwiOoe-knZX6Y2w6YCYyc0HHjlgKQIOqsbRPaNdixriO9u7zv_na_8vd-f-N8XA7cn1No0wl5PFIqeOl2aSn6czxw45FJ9hBlnpTMg49TVMWB7oXNYv-_cHdl5h3gG113yXDRePHrrs_uFggOWQbvQtZPMttzEamoiCRv_075-ckdAcFwFSNVJCoAq7_XSh3DrbNA&lib=MueOZVR_ZwqSXLeK4SkjQyLw14PNv2Jc1';
+// ⚠️ ЗАМЕНИТЕ НА ВАШ URL ИЗ РАЗВЁРТЫВАНИЯ
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzYoW5mKzznhmrygbOC9g8bITiNKQWRTaGKVSqJ8n4PLdYe2wqB47S656fTK_xIieLYJA/exec';
 
-// Типы маркеров
 const markerTypes = [
   { id: 'elk',        name: 'Олень',    icon: BASE + 'elk.png' },
   { id: 'wolf',       name: 'Волк',     icon: BASE + 'wolf.png' },
@@ -135,7 +123,6 @@ const markerTypes = [
   { id: 'sabertooth', name: 'Саблезуб', icon: BASE + 'cat.png' },
 ];
 
-// Реактивные переменные
 const editMode        = ref(false);
 const formTitle       = ref('');
 const formDescription = ref('');
@@ -152,7 +139,6 @@ let updateInterval = null;
 const allMarkers = ref([]);
 const leafletMarkers = [];
 
-// ---- Вспомогательные функции ----
 function getTypeIcon(typeId) {
   return markerTypes.find(t => t.id === typeId)?.icon || BASE + 'elk.png';
 }
@@ -171,16 +157,18 @@ function createTooltipContent(title, description) {
   return `<b>${title}</b>`;
 }
 
-// ---- Работа с Google Sheets (с проверками) ----
+// ---------- РАБОТА С СЕРВЕРОМ ----------
 async function loadMarkers() {
   try {
     const res = await fetch(WEB_APP_URL);
     const text = await res.text();
+    // Удаляем возможный BOM (U+FEFF) в начале
+    const cleanText = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
     let data;
     try {
-      data = JSON.parse(text);
-    } catch(e) {
-      console.error('Не JSON, первые 100 символов:', text.substring(0,100));
+      data = JSON.parse(cleanText);
+    } catch (e) {
+      console.error('Ответ не JSON, первые 100 символов:', cleanText.substring(0, 100));
       toast('❌ Сервер вернул не JSON (проверьте скрипт)');
       return;
     }
@@ -210,14 +198,15 @@ async function addMarkerToSheet(marker) {
 
   const res = await fetch(WEB_APP_URL, {
     method: 'POST',
-    body: formData
+    body: formData,
   });
   const text = await res.text();
+  const cleanText = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
   let json;
   try {
-    json = JSON.parse(text);
-  } catch(e) {
-    throw new Error(`Сервер ответил не JSON: ${text.substring(0,100)}`);
+    json = JSON.parse(cleanText);
+  } catch (e) {
+    throw new Error(`Сервер ответил не JSON: ${cleanText.substring(0, 100)}`);
   }
   if (json.error) throw new Error(json.error);
   return json;
@@ -230,20 +219,21 @@ async function deleteMarkerFromSheet(id) {
 
   const res = await fetch(WEB_APP_URL, {
     method: 'POST',
-    body: formData
+    body: formData,
   });
   const text = await res.text();
+  const cleanText = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
   let json;
   try {
-    json = JSON.parse(text);
-  } catch(e) {
-    throw new Error(`Сервер ответил не JSON: ${text.substring(0,100)}`);
+    json = JSON.parse(cleanText);
+  } catch (e) {
+    throw new Error(`Сервер ответил не JSON: ${cleanText.substring(0, 100)}`);
   }
   if (json.error) throw new Error(json.error);
   return json;
 }
 
-// ---- Управление маркерами на карте ----
+// ---------- КАРТА ----------
 function refreshMapMarkers() {
   leafletMarkers.forEach(item => {
     if (mapInstance && mapInstance.hasLayer(item.marker)) mapInstance.removeLayer(item.marker);
@@ -252,10 +242,11 @@ function refreshMapMarkers() {
 
   allMarkers.value.forEach(m => {
     let coordsArray;
-    if (typeof m.coords === 'string') {
-      coordsArray = JSON.parse(m.coords);
-    } else {
-      coordsArray = m.coords;
+    try {
+      coordsArray = typeof m.coords === 'string' ? JSON.parse(m.coords) : m.coords;
+    } catch (e) {
+      console.warn('Ошибка парсинга координат:', m.coords);
+      return;
     }
     const marker = L.marker(coordsArray, {
       icon: createLeafletIcon(m.type),
@@ -281,7 +272,7 @@ function applyFilters() {
   });
 }
 
-// ---- Действия пользователя ----
+// ---------- ДЕЙСТВИЯ ПОЛЬЗОВАТЕЛЯ ----------
 async function saveMarker() {
   if (!pendingLatLng) return;
   const title = formTitle.value.trim() || `Точка ${allMarkers.value.length + 1}`;
@@ -341,7 +332,7 @@ function toast(msg) {
   setTimeout(() => { toastMsg.value = ''; }, 2000);
 }
 
-// ---- Инициализация карты ----
+// ---------- ИНИЦИАЛИЗАЦИЯ КАРТЫ ----------
 onMounted(() => {
   const img = new Image();
   img.src = BASE + '5171-0-1480272622.webp';
@@ -395,7 +386,6 @@ onBeforeUnmount(() => {
   left: 0;
 }
 
-/* Кнопка режима */
 .mode-btn {
   position: fixed;
   top: 16px;
@@ -421,7 +411,6 @@ onBeforeUnmount(() => {
   color: #ffeedd;
 }
 
-/* Панель */
 .panel {
   position: fixed;
   top: 0;
@@ -444,7 +433,6 @@ onBeforeUnmount(() => {
   width: 220px;
 }
 
-/* Заголовок панели */
 .panel-header {
   display: flex;
   align-items: center;
@@ -465,7 +453,6 @@ onBeforeUnmount(() => {
 .section {
   margin-bottom: 18px;
 }
-
 .section-title {
   font: bold 11px 'Cinzel', serif;
   letter-spacing: 3px;
@@ -474,13 +461,11 @@ onBeforeUnmount(() => {
   padding-bottom: 6px;
   margin-bottom: 10px;
 }
-
 .hint {
   color: #8b7355;
   font-style: italic;
   font-size: 13px;
 }
-
 .coords-line {
   background: rgba(139, 115, 85, 0.15);
   border: 1px solid #c4a87a;
@@ -492,7 +477,6 @@ onBeforeUnmount(() => {
   border-radius: 4px;
 }
 
-/* Фильтры */
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -549,7 +533,6 @@ onBeforeUnmount(() => {
   border-color: #8b7355;
 }
 
-/* Выбор типа */
 .type-label {
   font: 11px 'Cinzel', serif;
   color: #6d5a48;
@@ -587,7 +570,6 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 8px rgba(139, 115, 85, 0.3);
 }
 
-/* Инпуты */
 .panel input {
   width: 100%;
   padding: 8px 10px;
@@ -599,7 +581,6 @@ onBeforeUnmount(() => {
   margin-bottom: 6px;
   outline: none;
   box-sizing: border-box;
-  transition: border-color 0.15s;
 }
 .panel input:focus {
   border-color: #6d5a48;
@@ -610,7 +591,6 @@ onBeforeUnmount(() => {
   font-style: italic;
 }
 
-/* Кнопки формы */
 .form-btns {
   display: flex;
   gap: 6px;
@@ -648,7 +628,6 @@ onBeforeUnmount(() => {
   color: #3e2f23;
 }
 
-/* Список маркеров */
 .marker-list {
   display: flex;
   flex-direction: column;
@@ -695,7 +674,6 @@ onBeforeUnmount(() => {
   color: #8b2500;
 }
 
-/* Подвал */
 .panel-footer {
   margin-top: auto;
   padding-top: 14px;
@@ -717,14 +695,12 @@ onBeforeUnmount(() => {
 .panel-footer a {
   color: #8b2500;
   text-decoration: none;
-  font-weight: bold;
   border-bottom: 1px dashed #8b2500;
 }
 .panel-footer a:hover {
   color: #a03000;
 }
 
-/* Тост */
 .toast {
   position: fixed;
   bottom: 24px;
@@ -744,7 +720,6 @@ onBeforeUnmount(() => {
 </style>
 
 <style>
-/* Глобальные стили для маркеров и тултипов */
 .map-marker {
   width: 36px;
   height: 36px;
@@ -767,7 +742,6 @@ onBeforeUnmount(() => {
   object-fit: contain;
   filter: brightness(10);
 }
-
 .custom-tooltip {
   background: linear-gradient(135deg, #5c4a3a, #3e2f23);
   color: #e8dcc8;
