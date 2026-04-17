@@ -1,6 +1,12 @@
 <template>
   <div id="map" class="leaflet-map"></div>
 
+  <!-- Индикатор загрузки (правый верхний угол, без оверлея) -->
+  <div v-if="isLoading" class="loading-indicator">
+    <div class="spinner"></div>
+    <div class="loading-text">Загрузка...</div>
+  </div>
+
   <button class="mode-btn" :class="{ active: editMode }" @click="toggleMode">
     {{ editMode ? '🏹 Расставляем' : '👁️ Смотрим' }}
   </button>
@@ -8,7 +14,7 @@
   <div class="panel" :class="{ 'panel-view': !editMode }">
     <div class="panel-header">
       <span class="panel-logo">🗺️</span>
-      <span class="panel-title">Карта дичи</span>
+      <span class="panel-title"></span>
     </div>
 
     <div class="section">
@@ -91,8 +97,7 @@
       <div class="panel-footer">
         <div class="footer-ornament">— ◆ —</div>
         Данные синхронизируются с Google Таблицей<br>
-        <strong>Намо гро-Аденну</strong><br>
-        в Discord:<br>
+        <strong>Багрепорт в Discord:</strong><br>
         <a href="https://discord.com/users/mashrooooooooms" target="_blank">
           mashrooooooooms
         </a>
@@ -111,7 +116,6 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const BASE = import.meta.env.BASE_URL;
-// ⚠️ ЗАМЕНИТЕ НА ВАШ URL ИЗ РАЗВЁРТЫВАНИЯ
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzYoW5mKzznhmrygbOC9g8bITiNKQWRTaGKVSqJ8n4PLdYe2wqB47S656fTK_xIieLYJA/exec';
 
 const markerTypes = [
@@ -131,6 +135,7 @@ const selectedType    = ref('elk');
 const titleInput      = ref(null);
 const toastMsg        = ref('');
 const activeFilters   = ref(markerTypes.map(t => t.id));
+const isLoading       = ref(false);
 
 let pendingLatLng = null;
 let mapInstance   = null;
@@ -159,10 +164,10 @@ function createTooltipContent(title, description) {
 
 // ---------- РАБОТА С СЕРВЕРОМ ----------
 async function loadMarkers() {
+  isLoading.value = true;
   try {
     const res = await fetch(WEB_APP_URL);
     const text = await res.text();
-    // Удаляем возможный BOM (U+FEFF) в начале
     const cleanText = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
     let data;
     try {
@@ -186,6 +191,8 @@ async function loadMarkers() {
   } catch (err) {
     console.error(err);
     toast('❌ Ошибка загрузки данных');
+  } finally {
+    isLoading.value = false;
   }
 }
 
@@ -343,15 +350,15 @@ onMounted(() => {
 
     const map = L.map('map', {
       crs: L.CRS.Simple,
-      minZoom: -3,
-      maxZoom: 4,
+      minZoom: -10,
+      maxZoom: 10,
       zoomSnap: 0.25,
       attributionControl: false,
     });
     mapInstance = map;
     L.imageOverlay(BASE + '5171-0-1480272622.webp', imageBounds).addTo(map);
     map.fitBounds(imageBounds);
-    map.setMaxBounds(imageBounds);
+    // Без ограничения границ
 
     map.on('click', (e) => {
       if (!editMode.value) return;
@@ -386,10 +393,48 @@ onBeforeUnmount(() => {
   left: 0;
 }
 
+/* Индикатор загрузки — правый верхний угол, без оверлея */
+.loading-indicator {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: 'Cinzel', serif;
+  backdrop-filter: blur(4px);
+  border: 1px solid #8b7355;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e8dcc8;
+  border-top: 2px solid #8b2500;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  color: #e8dcc8;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .mode-btn {
   position: fixed;
   top: 16px;
-  left: 16px;
+  left: 60px;
   z-index: 1000;
   padding: 10px 18px;
   background: linear-gradient(135deg, #5c4a3a, #3e2f23);
