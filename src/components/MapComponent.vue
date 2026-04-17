@@ -25,12 +25,7 @@
           class="filter-item"
           :class="{ active: activeFilters.includes(type.id) }"
         >
-          <input
-            type="checkbox"
-            :value="type.id"
-            v-model="activeFilters"
-            @change="applyFilters"
-          />
+          <input type="checkbox" :value="type.id" v-model="activeFilters" @change="applyFilters" />
           <img :src="type.icon" :alt="type.name" />
           <span>{{ type.name }}</span>
         </label>
@@ -41,7 +36,7 @@
       </div>
     </div>
 
-    <!-- Форма -->
+    <!-- Форма добавления (только в режиме редактирования) -->
     <template v-if="editMode">
       <div class="section">
         <div class="section-title">📍 НОВЫЙ МАРКЕР</div>
@@ -75,7 +70,7 @@
             @keyup.enter="saveMarker"
           />
           <div class="form-btns">
-            <button class="btn-add" @click="saveMarker">🏹 СКОПИРОВАТЬ</button>
+            <button class="btn-add" @click="saveMarker">🏹 ДОБАВИТЬ</button>
             <button class="btn-cancel" @click="cancelMarker">ОТМЕНА</button>
           </div>
         </template>
@@ -85,26 +80,26 @@
         </template>
       </div>
 
-      <!-- Список -->
-      <div class="section" v-if="placedMarkers.length > 0">
-        <div class="section-title">🗡️ РАЗМЕЩЕНО ({{ placedMarkers.length }})</div>
+      <!-- Список всех маркеров (из таблицы) -->
+      <div class="section" v-if="allMarkers.length > 0">
+        <div class="section-title">🗡️ ВСЕ МАРКЕРЫ ({{ allMarkers.length }})</div>
         <div class="marker-list">
-          <div class="marker-item" v-for="(m, i) in placedMarkers" :key="i">
+          <div class="marker-item" v-for="m in allMarkers" :key="m.id">
             <img :src="getTypeIcon(m.type)" class="marker-item-icon" />
             <div class="marker-info">
               <span class="marker-name">{{ m.title }}</span>
               <span class="marker-coords">{{ m.coords }}</span>
             </div>
-            <button class="btn-remove" @click="removeMarker(i)">✕</button>
+            <button class="btn-remove" @click="removeMarker(m.id)">✕</button>
           </div>
         </div>
-        <button class="btn-outline" @click="clearAll">ОЧИСТИТЬ ВСЁ</button>
+        <!-- Можно добавить кнопку массового удаления, но для простоты оставим только по одному -->
       </div>
 
       <!-- Подсказка -->
       <div class="panel-footer">
         <div class="footer-ornament">— ◆ —</div>
-        Скопированное отправьте<br>
+        Данные синхронизируются с Google Таблицей<br>
         <strong>Намо гро-Аденну</strong><br>
         в Discord:<br>
         <a href="https://discord.com/users/mashrooooooooms" target="_blank">
@@ -122,14 +117,15 @@
 </template>
 
 <script setup>
-import { onMounted, ref, nextTick } from 'vue';
+import { onMounted, ref, nextTick, onBeforeUnmount } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const BASE = import.meta.env.BASE_URL;
+// ⚠️ ЗАМЕНИТЕ НА ВАШ URL ВЕБ-ПРИЛОЖЕНИЯ:
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwWwkU8FDsc7NEPt1OxRmV_71QSEUGmPH1V3jBszgILL23LopbSYhvzoyL-RYmgnhUxLA/exec';
 
-// =====================================================
-// ТИПЫ МАРКЕРОВ
+// Типы маркеров
 const markerTypes = [
   { id: 'elk',        name: 'Олень',    icon: BASE + 'elk.png' },
   { id: 'wolf',       name: 'Волк',     icon: BASE + 'wolf.png' },
@@ -137,23 +133,9 @@ const markerTypes = [
   { id: 'bear',       name: 'Медведь',  icon: BASE + 'bear.png' },
   { id: 'troll',      name: 'Тролль',   icon: BASE + 'troll.png' },
   { id: 'sabertooth', name: 'Саблезуб', icon: BASE + 'cat.png' },
-  // { id: 'mammoth', name: 'Мамонт',  icon: BASE + 'mammoth.png' },
-  // { id: 'giant',   name: 'Великан', icon: BASE + 'giant.png' },
 ];
-// =====================================================
 
-// =====================================================
-// ПОСТОЯННЫЕ МАРКЕРЫ — вставляй сюда скопированное
-const markers = [
-  {
-    coords: [500, 900],
-    type: 'elk',
-    title: 'Внезапный олень для примера',
-    description: 'Описание того что на точке'
-  },
-];
-// =====================================================
-
+// Реактивные переменные
 const editMode        = ref(false);
 const formTitle       = ref('');
 const formDescription = ref('');
@@ -161,16 +143,17 @@ const pendingCoords   = ref('');
 const selectedType    = ref('elk');
 const titleInput      = ref(null);
 const toastMsg        = ref('');
+const activeFilters   = ref(markerTypes.map(t => t.id));
 
-const activeFilters = ref(markerTypes.map(t => t.id));
+let pendingLatLng = null;
+let mapInstance   = null;
+let updateInterval = null;
 
-let pendingLatLng          = null;
-let mapInstance            = null;
+// Данные из Google Sheets
+const allMarkers = ref([]);
+const leafletMarkers = []; // храним { marker, type, id }
 
-const placedMarkers           = ref([]);
-const tempLeafletMarkers      = [];
-const permanentLeafletMarkers = [];
-
+// ---- Вспомогательные функции ----
 function getTypeIcon(typeId) {
   return markerTypes.find(t => t.id === typeId)?.icon || BASE + 'elk.png';
 }
@@ -179,21 +162,125 @@ function createLeafletIcon(typeId) {
   const iconUrl = getTypeIcon(typeId);
   return L.divIcon({
     className: '',
-    html: `
-      <div class="map-marker">
-        <img src="${iconUrl}" alt="" />
-      </div>
-    `,
+    html: `<div class="map-marker"><img src="${iconUrl}" alt="" /></div>`,
     iconSize: [36, 36],
     iconAnchor: [18, 18],
   });
 }
 
 function createTooltipContent(title, description) {
-  if (description) {
-    return `<b>${title}</b><br><span>${description}</span>`;
-  }
+  if (description) return `<b>${title}</b><br><span>${description}</span>`;
   return `<b>${title}</b>`;
+}
+
+// ---- Работа с Google Sheets ----
+async function loadMarkers() {
+  try {
+    const res = await fetch(WEB_APP_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    allMarkers.value = data;
+    refreshMapMarkers();
+    toast('📡 Данные обновлены');
+  } catch (err) {
+    console.error(err);
+    toast('❌ Ошибка загрузки данных');
+  }
+}
+
+async function addMarkerToSheet(marker) {
+  const res = await fetch(WEB_APP_URL, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(marker),
+  });
+  if (!res.ok) throw new Error('Ошибка записи');
+  return await res.json();
+}
+
+async function deleteMarkerFromSheet(id) {
+  const res = await fetch(`${WEB_APP_URL}?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error('Ошибка удаления');
+}
+
+// ---- Управление маркерами на карте ----
+function refreshMapMarkers() {
+  // Удаляем все существующие маркеры с карты
+  leafletMarkers.forEach(item => {
+    if (mapInstance && mapInstance.hasLayer(item.marker)) mapInstance.removeLayer(item.marker);
+  });
+  leafletMarkers.length = 0;
+
+  // Добавляем заново из allMarkers
+  allMarkers.value.forEach(m => {
+    let coordsArray;
+    if (typeof m.coords === 'string') {
+      coordsArray = JSON.parse(m.coords);
+    } else {
+      coordsArray = m.coords;
+    }
+    const marker = L.marker(coordsArray, {
+      icon: createLeafletIcon(m.type),
+    }).bindTooltip(createTooltipContent(m.title, m.description), {
+      direction: 'top',
+      offset: [0, -20],
+      className: 'custom-tooltip',
+    });
+    leafletMarkers.push({ marker, type: m.type, id: m.id });
+    if (activeFilters.value.includes(m.type)) {
+      marker.addTo(mapInstance);
+    }
+  });
+}
+
+function applyFilters() {
+  leafletMarkers.forEach(({ marker, type }) => {
+    if (activeFilters.value.includes(type)) {
+      if (!mapInstance.hasLayer(marker)) marker.addTo(mapInstance);
+    } else {
+      if (mapInstance.hasLayer(marker)) mapInstance.removeLayer(marker);
+    }
+  });
+}
+
+// ---- Действия пользователя ----
+async function saveMarker() {
+  if (!pendingLatLng) return;
+  const title = formTitle.value.trim() || `Точка ${allMarkers.value.length + 1}`;
+  const description = formDescription.value.trim() || '';
+  const type = selectedType.value;
+  const coordsStr = `[${Math.round(pendingLatLng.lat)}, ${Math.round(pendingLatLng.lng)}]`;
+
+  try {
+    await addMarkerToSheet({ coords: coordsStr, type, title, description });
+    await loadMarkers(); // перезагружаем все маркеры из таблицы
+    toast(`✅ Добавлен: ${title}`);
+    cancelMarker();
+  } catch (err) {
+    console.error(err);
+    toast('❌ Ошибка при добавлении');
+  }
+}
+
+async function removeMarker(id) {
+  try {
+    await deleteMarkerFromSheet(id);
+    await loadMarkers();
+    toast('🗑️ Маркер удалён');
+  } catch (err) {
+    console.error(err);
+    toast('❌ Ошибка удаления');
+  }
+}
+
+function cancelMarker() {
+  pendingCoords.value = '';
+  pendingLatLng = null;
+  formTitle.value = '';
+  formDescription.value = '';
 }
 
 function toggleMode() {
@@ -202,65 +289,6 @@ function toggleMode() {
   if (mapInstance) {
     mapInstance.getContainer().style.cursor = editMode.value ? 'crosshair' : '';
   }
-}
-
-async function saveMarker() {
-  if (!pendingLatLng) return;
-
-  const title       = formTitle.value.trim() || `Точка ${placedMarkers.value.length + 1}`;
-  const description = formDescription.value.trim() || '';
-  const type        = selectedType.value;
-
-  const lm = L.marker(pendingLatLng, {
-    icon: createLeafletIcon(type),
-  })
-    .addTo(mapInstance)
-    .bindTooltip(createTooltipContent(title, description), {
-      direction: 'top',
-      offset: [0, -20],
-      className: 'custom-tooltip',
-    });
-
-  tempLeafletMarkers.push({ marker: lm, type });
-  placedMarkers.value.push({ coords: pendingCoords.value, type, title, description });
-
-  const text =
-`  {
-    coords: ${pendingCoords.value},
-    type: '${type}',
-    title: '${title}',
-    description: '${description}'
-  }`;
-
-  await navigator.clipboard.writeText(text);
-  toast(`📋 Скопировано: ${title}`);
-
-  pendingCoords.value   = '';
-  pendingLatLng         = null;
-  formTitle.value       = '';
-  formDescription.value = '';
-}
-
-function cancelMarker() {
-  pendingCoords.value   = '';
-  pendingLatLng         = null;
-  formTitle.value       = '';
-  formDescription.value = '';
-}
-
-function removeMarker(i) {
-  const removed = placedMarkers.value[i];
-  mapInstance.removeLayer(tempLeafletMarkers[i].marker);
-  tempLeafletMarkers.splice(i, 1);
-  placedMarkers.value.splice(i, 1);
-  toast(`🗑️ ${removed.title}`);
-}
-
-function clearAll() {
-  tempLeafletMarkers.forEach(m => mapInstance.removeLayer(m.marker));
-  tempLeafletMarkers.length = 0;
-  placedMarkers.value = [];
-  toast('Очищено');
 }
 
 function selectAllFilters() {
@@ -273,33 +301,15 @@ function clearAllFilters() {
   applyFilters();
 }
 
-function applyFilters() {
-  permanentLeafletMarkers.forEach(({ marker, type }) => {
-    if (activeFilters.value.includes(type)) {
-      if (!mapInstance.hasLayer(marker)) marker.addTo(mapInstance);
-    } else {
-      if (mapInstance.hasLayer(marker)) mapInstance.removeLayer(marker);
-    }
-  });
-
-  tempLeafletMarkers.forEach(({ marker, type }) => {
-    if (activeFilters.value.includes(type)) {
-      if (!mapInstance.hasLayer(marker)) marker.addTo(mapInstance);
-    } else {
-      if (mapInstance.hasLayer(marker)) mapInstance.removeLayer(marker);
-    }
-  });
-}
-
 function toast(msg) {
   toastMsg.value = msg;
   setTimeout(() => { toastMsg.value = ''; }, 2000);
 }
 
+// ---- Инициализация карты ----
 onMounted(() => {
   const img = new Image();
-  img.src = BASE + 'sky.jpg';
-
+  img.src = BASE + '5171-0-1480272622.webp';
   img.onload = () => {
     const boundsH = 1000;
     const boundsW = (img.naturalWidth / img.naturalHeight) * boundsH;
@@ -312,38 +322,31 @@ onMounted(() => {
       zoomSnap: 0.25,
       attributionControl: false,
     });
-
     mapInstance = map;
-    L.imageOverlay(BASE + 'sky.jpg', imageBounds).addTo(map);
+    L.imageOverlay(BASE + '5171-0-1480272622.webp', imageBounds).addTo(map);
     map.fitBounds(imageBounds);
     map.setMaxBounds(imageBounds);
-
-    markers.forEach(m => {
-      const lm = L.marker(m.coords, {
-        icon: createLeafletIcon(m.type),
-      })
-        .addTo(map)
-        .bindTooltip(createTooltipContent(m.title, m.description), {
-          direction: 'top',
-          offset: [0, -20],
-          className: 'custom-tooltip',
-        });
-
-      permanentLeafletMarkers.push({ marker: lm, type: m.type });
-    });
 
     map.on('click', (e) => {
       if (!editMode.value) return;
       const lat = Math.round(e.latlng.lat);
       const lng = Math.round(e.latlng.lng);
-      pendingCoords.value   = `[${lat}, ${lng}]`;
-      pendingLatLng         = e.latlng;
-      formTitle.value       = '';
+      pendingCoords.value = `[${lat}, ${lng}]`;
+      pendingLatLng = e.latlng;
+      formTitle.value = '';
       formDescription.value = '';
-      selectedType.value    = 'elk';
+      selectedType.value = 'elk';
       nextTick(() => titleInput.value?.focus());
     });
+
+    // Загружаем данные и запускаем автообновление каждые 30 секунд
+    loadMarkers();
+    updateInterval = setInterval(loadMarkers, 30000);
   };
+});
+
+onBeforeUnmount(() => {
+  if (updateInterval) clearInterval(updateInterval);
 });
 </script>
 
@@ -358,7 +361,7 @@ onMounted(() => {
   left: 0;
 }
 
-/* ── Кнопка режима — левый верхний угол ── */
+/* Кнопка режима */
 .mode-btn {
   position: fixed;
   top: 16px;
@@ -384,7 +387,7 @@ onMounted(() => {
   color: #ffeedd;
 }
 
-/* ── Панель ── */
+/* Панель */
 .panel {
   position: fixed;
   top: 0;
@@ -407,7 +410,7 @@ onMounted(() => {
   width: 220px;
 }
 
-/* ── Заголовок панели ── */
+/* Заголовок панели */
 .panel-header {
   display: flex;
   align-items: center;
@@ -455,7 +458,7 @@ onMounted(() => {
   border-radius: 4px;
 }
 
-/* ── Фильтры ── */
+/* Фильтры */
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -512,7 +515,7 @@ onMounted(() => {
   border-color: #8b7355;
 }
 
-/* ── Выбор типа ── */
+/* Выбор типа */
 .type-label {
   font: 11px 'Cinzel', serif;
   color: #6d5a48;
@@ -550,7 +553,7 @@ onMounted(() => {
   box-shadow: 0 0 8px rgba(139, 115, 85, 0.3);
 }
 
-/* ── Инпуты ── */
+/* Инпуты */
 .panel input {
   width: 100%;
   padding: 8px 10px;
@@ -573,7 +576,7 @@ onMounted(() => {
   font-style: italic;
 }
 
-/* ── Кнопки формы ── */
+/* Кнопки формы */
 .form-btns {
   display: flex;
   gap: 6px;
@@ -611,7 +614,7 @@ onMounted(() => {
   color: #3e2f23;
 }
 
-/* ── Список маркеров ── */
+/* Список маркеров */
 .marker-list {
   display: flex;
   flex-direction: column;
@@ -658,23 +661,7 @@ onMounted(() => {
   color: #8b2500;
 }
 
-.btn-outline {
-  width: 100%;
-  padding: 8px;
-  background: transparent;
-  color: #8b7355;
-  border: 1px solid #c4a87a;
-  border-radius: 4px;
-  font: bold 10px 'Cinzel', serif;
-  letter-spacing: 2px;
-  cursor: pointer;
-}
-.btn-outline:hover {
-  border-color: #6d5a48;
-  color: #3e2f23;
-}
-
-/* ── Подсказка внизу ── */
+/* Подвал */
 .panel-footer {
   margin-top: auto;
   padding-top: 14px;
@@ -703,7 +690,7 @@ onMounted(() => {
   color: #a03000;
 }
 
-/* ── Тост ── */
+/* Тост */
 .toast {
   position: fixed;
   bottom: 24px;
@@ -723,7 +710,7 @@ onMounted(() => {
 </style>
 
 <style>
-/* ── Маркер на карте ── */
+/* Глобальные стили для маркеров и тултипов */
 .map-marker {
   width: 36px;
   height: 36px;
@@ -733,9 +720,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow:
-    0 2px 8px rgba(139, 37, 0, 0.5),
-    0 0 0 2px rgba(139, 37, 0, 0.3);
+  box-shadow: 0 2px 8px rgba(139, 37, 0, 0.5), 0 0 0 2px rgba(139, 37, 0, 0.3);
   cursor: pointer;
   transition: transform 0.15s;
 }
@@ -749,7 +734,6 @@ onMounted(() => {
   filter: brightness(10);
 }
 
-/* ── Tooltip ── */
 .custom-tooltip {
   background: linear-gradient(135deg, #5c4a3a, #3e2f23);
   color: #e8dcc8;
