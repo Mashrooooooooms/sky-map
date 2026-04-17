@@ -122,7 +122,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const BASE = import.meta.env.BASE_URL;
-// ⚠️ ЗАМЕНИТЕ НА ВАШ URL ВЕБ-ПРИЛОЖЕНИЯ:
+// ⚠️ ЗАМЕНИТЕ НА ВАШ URL ВЕБ-ПРИЛОЖЕНИЯ (из Google Apps Script)
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyN-RHqNRZKOYvJmsM8y1D4iDvir5Bpa_rvl4gVU7-fCP0EcsG5MXs5ujvLH9T9HVdK/exec';
 
 // Типы маркеров
@@ -149,9 +149,8 @@ let pendingLatLng = null;
 let mapInstance   = null;
 let updateInterval = null;
 
-// Данные из Google Sheets
 const allMarkers = ref([]);
-const leafletMarkers = []; // храним { marker, type, id }
+const leafletMarkers = [];
 
 // ---- Вспомогательные функции ----
 function getTypeIcon(typeId) {
@@ -159,10 +158,9 @@ function getTypeIcon(typeId) {
 }
 
 function createLeafletIcon(typeId) {
-  const iconUrl = getTypeIcon(typeId);
   return L.divIcon({
     className: '',
-    html: `<div class="map-marker"><img src="${iconUrl}" alt="" /></div>`,
+    html: `<div class="map-marker"><img src="${getTypeIcon(typeId)}" alt="" /></div>`,
     iconSize: [36, 36],
     iconAnchor: [18, 18],
   });
@@ -173,7 +171,7 @@ function createTooltipContent(title, description) {
   return `<b>${title}</b>`;
 }
 
-// ---- Работа с Google Sheets ----
+// ---- Работа с Google Sheets (с проверками) ----
 async function loadMarkers() {
   try {
     const res = await fetch(WEB_APP_URL);
@@ -182,12 +180,15 @@ async function loadMarkers() {
     try {
       data = JSON.parse(text);
     } catch(e) {
-      console.error('Не JSON:', text);
-      toast('❌ Сервер вернул не JSON');
+      console.error('Не JSON, первые 100 символов:', text.substring(0,100));
+      toast('❌ Сервер вернул не JSON (проверьте скрипт)');
+      return;
+    }
+    if (data && data.error) {
+      toast(`❌ Ошибка сервера: ${data.error}`);
       return;
     }
     if (!Array.isArray(data)) {
-      console.error('Не массив:', data);
       toast('❌ Неверный формат данных');
       return;
     }
@@ -196,7 +197,7 @@ async function loadMarkers() {
     toast(`📡 Загружено ${data.length} маркеров`);
   } catch (err) {
     console.error(err);
-    toast('❌ Ошибка загрузки');
+    toast('❌ Ошибка загрузки данных');
   }
 }
 
@@ -209,16 +210,17 @@ async function addMarkerToSheet(marker) {
 
   const res = await fetch(WEB_APP_URL, {
     method: 'POST',
-    body: formData   // ❗ НЕ ставьте headers, браузер сам выставит multipart/form-data
+    body: formData
   });
   const text = await res.text();
+  let json;
   try {
-    const json = JSON.parse(text);
-    if (!json.success) throw new Error(json.error || 'Неизвестная ошибка');
-    return json;
+    json = JSON.parse(text);
   } catch(e) {
-    throw new Error(`Сервер ответил: ${text.substring(0, 100)}`);
+    throw new Error(`Сервер ответил не JSON: ${text.substring(0,100)}`);
   }
+  if (json.error) throw new Error(json.error);
+  return json;
 }
 
 async function deleteMarkerFromSheet(id) {
@@ -231,24 +233,23 @@ async function deleteMarkerFromSheet(id) {
     body: formData
   });
   const text = await res.text();
+  let json;
   try {
-    const json = JSON.parse(text);
-    if (!json.success) throw new Error(json.error || 'Ошибка удаления');
-    return json;
+    json = JSON.parse(text);
   } catch(e) {
-    throw new Error(`Сервер ответил: ${text.substring(0, 100)}`);
+    throw new Error(`Сервер ответил не JSON: ${text.substring(0,100)}`);
   }
+  if (json.error) throw new Error(json.error);
+  return json;
 }
 
 // ---- Управление маркерами на карте ----
 function refreshMapMarkers() {
-  // Удаляем все существующие маркеры с карты
   leafletMarkers.forEach(item => {
     if (mapInstance && mapInstance.hasLayer(item.marker)) mapInstance.removeLayer(item.marker);
   });
   leafletMarkers.length = 0;
 
-  // Добавляем заново из allMarkers
   allMarkers.value.forEach(m => {
     let coordsArray;
     if (typeof m.coords === 'string') {
@@ -290,12 +291,12 @@ async function saveMarker() {
 
   try {
     await addMarkerToSheet({ coords: coordsStr, type, title, description });
-    await loadMarkers(); // перезагружаем все маркеры из таблицы
+    await loadMarkers();
     toast(`✅ Добавлен: ${title}`);
     cancelMarker();
   } catch (err) {
     console.error(err);
-    toast('❌ Ошибка при добавлении');
+    toast(`❌ Ошибка: ${err.message}`);
   }
 }
 
@@ -306,7 +307,7 @@ async function removeMarker(id) {
     toast('🗑️ Маркер удалён');
   } catch (err) {
     console.error(err);
-    toast('❌ Ошибка удаления');
+    toast(`❌ Ошибка: ${err.message}`);
   }
 }
 
@@ -373,7 +374,6 @@ onMounted(() => {
       nextTick(() => titleInput.value?.focus());
     });
 
-    // Загружаем данные и запускаем автообновление каждые 30 секунд
     loadMarkers();
     updateInterval = setInterval(loadMarkers, 30000);
   };
