@@ -177,14 +177,26 @@ function createTooltipContent(title, description) {
 async function loadMarkers() {
   try {
     const res = await fetch(WEB_APP_URL);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch(e) {
+      console.error('Не JSON:', text);
+      toast('❌ Сервер вернул не JSON');
+      return;
+    }
+    if (!Array.isArray(data)) {
+      console.error('Не массив:', data);
+      toast('❌ Неверный формат данных');
+      return;
+    }
     allMarkers.value = data;
     refreshMapMarkers();
-    toast('📡 Данные обновлены');
+    toast(`📡 Загружено ${data.length} маркеров`);
   } catch (err) {
     console.error(err);
-    toast('❌ Ошибка загрузки данных');
+    toast('❌ Ошибка загрузки');
   }
 }
 
@@ -197,10 +209,16 @@ async function addMarkerToSheet(marker) {
 
   const res = await fetch(WEB_APP_URL, {
     method: 'POST',
-    body: formData   // без headers – браузер сам выставит multipart/form-data
+    body: formData   // ❗ НЕ ставьте headers, браузер сам выставит multipart/form-data
   });
-  if (!res.ok) throw new Error('Ошибка записи');
-  return await res.json();
+  const text = await res.text();
+  try {
+    const json = JSON.parse(text);
+    if (!json.success) throw new Error(json.error || 'Неизвестная ошибка');
+    return json;
+  } catch(e) {
+    throw new Error(`Сервер ответил: ${text.substring(0, 100)}`);
+  }
 }
 
 async function deleteMarkerFromSheet(id) {
@@ -212,8 +230,14 @@ async function deleteMarkerFromSheet(id) {
     method: 'POST',
     body: formData
   });
-  if (!res.ok) throw new Error('Ошибка удаления');
-  return await res.json();
+  const text = await res.text();
+  try {
+    const json = JSON.parse(text);
+    if (!json.success) throw new Error(json.error || 'Ошибка удаления');
+    return json;
+  } catch(e) {
+    throw new Error(`Сервер ответил: ${text.substring(0, 100)}`);
+  }
 }
 
 // ---- Управление маркерами на карте ----
