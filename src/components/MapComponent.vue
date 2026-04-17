@@ -123,7 +123,7 @@ import 'leaflet/dist/leaflet.css';
 
 const BASE = import.meta.env.BASE_URL;
 // ⚠️ ЗАМЕНИТЕ НА ВАШ URL ВЕБ-ПРИЛОЖЕНИЯ (из Google Apps Script)
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyN-RHqNRZKOYvJmsM8y1D4iDvir5Bpa_rvl4gVU7-fCP0EcsG5MXs5ujvLH9T9HVdK/exec';
+const WEB_APP_URL = 'https://script.googleusercontent.com/macros/echo?user_content_key=AWDtjMVxywLPM5rb0cDw0uewbK0_jZJI2es0polaHnb2si-1nRNzKeFTplCrXprPptl_v3OXOgCmporDMbVxqd8zaRXPaZwiOoe-knZX6Y2w6YCYyc0HHjlgKQIOqsbRPaNdixriO9u7zv_na_8vd-f-N8XA7cn1No0wl5PFIqeOl2aSn6czxw45FJ9hBlnpTMg49TVMWB7oXNYv-_cHdl5h3gG113yXDRePHrrs_uFggOWQbvQtZPMttzEamoiCRv_075-ckdAcFwFSNVJCoAq7_XSh3DrbNA&lib=MueOZVR_ZwqSXLeK4SkjQyLw14PNv2Jc1';
 
 // Типы маркеров
 const markerTypes = [
