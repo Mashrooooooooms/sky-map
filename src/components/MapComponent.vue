@@ -123,7 +123,7 @@ import 'leaflet/dist/leaflet.css';
 
 const BASE = import.meta.env.BASE_URL;
 // ⚠️ ЗАМЕНИТЕ НА ВАШ URL ВЕБ-ПРИЛОЖЕНИЯ:
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwWwkU8FDsc7NEPt1OxRmV_71QSEUGmPH1V3jBszgILL23LopbSYhvzoyL-RYmgnhUxLA/exec';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyN-RHqNRZKOYvJmsM8y1D4iDvir5Bpa_rvl4gVU7-fCP0EcsG5MXs5ujvLH9T9HVdK/exec';
 
 // Типы маркеров
 const markerTypes = [
@@ -189,21 +189,31 @@ async function loadMarkers() {
 }
 
 async function addMarkerToSheet(marker) {
+  const formData = new FormData();
+  formData.append('coords', marker.coords);
+  formData.append('type', marker.type);
+  formData.append('title', marker.title);
+  formData.append('description', marker.description);
+
   const res = await fetch(WEB_APP_URL, {
     method: 'POST',
-    mode: 'cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(marker),
+    body: formData   // без headers – браузер сам выставит multipart/form-data
   });
   if (!res.ok) throw new Error('Ошибка записи');
   return await res.json();
 }
 
 async function deleteMarkerFromSheet(id) {
-  const res = await fetch(`${WEB_APP_URL}?id=${encodeURIComponent(id)}`, {
-    method: 'DELETE',
+  const formData = new FormData();
+  formData.append('id', id);
+  formData.append('_method', 'DELETE');
+
+  const res = await fetch(WEB_APP_URL, {
+    method: 'POST',
+    body: formData
   });
   if (!res.ok) throw new Error('Ошибка удаления');
+  return await res.json();
 }
 
 // ---- Управление маркерами на карте ----
