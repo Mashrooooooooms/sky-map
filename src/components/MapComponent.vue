@@ -92,19 +92,7 @@
     </template>
 
     <!-- Список всех маркеров (показывается только в режиме редактирования на десктопе, на мобильных всегда) -->
-    <div class="section" v-if="allMarkers.length > 0 && (!isMobile || !editMode)">
-      <div class="section-title">🗡️ ВСЕ МАРКЕРЫ ({{ allMarkers.length }})</div>
-      <div class="marker-list">
-        <div class="marker-item" v-for="m in allMarkers" :key="m.id">
-          <img :src="getTypeIcon(m.type)" class="marker-item-icon" />
-          <div class="marker-info">
-            <span class="marker-name">{{ m.title }}</span>
-            <span class="marker-coords">{{ m.coords }}</span>
-          </div>
-          <button v-if="!isMobile && editMode" class="btn-remove" @click="removeMarker(m.id)">✕</button>
-        </div>
-      </div>
-    </div>
+
 
     <div class="panel-footer">
       <div class="footer-ornament">— ◆ —</div>
