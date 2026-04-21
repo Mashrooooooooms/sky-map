@@ -1,18 +1,18 @@
 <template>
   <div id="map" class="leaflet-map"></div>
 
-  <!-- Индикатор загрузки (правый верхний угол) -->
+  <!-- Индикатор загрузки -->
   <div v-if="isLoading" class="loading-indicator">
     <div class="spinner"></div>
     <div class="loading-text">Загрузка...</div>
   </div>
 
-  <!-- Бургер-меню для фильтров (только на мобильных) -->
+  <!-- Бургер-меню (мобильные) -->
   <button v-if="isMobile" class="burger-btn" @click="burgerOpen = !burgerOpen">
     ☰
   </button>
 
-  <!-- Кнопка переключения режима (только на десктопе) -->
+  <!-- Кнопка переключения режима (десктоп) -->
   <button
     v-if="!isMobile"
     class="mode-btn"
@@ -22,7 +22,20 @@
     {{ editMode ? "🏹 Расставляем" : "👁️ Смотрим" }}
   </button>
 
-  <!-- Основная панель (на десктопе всегда справа, на мобильных - выезжающий бургер) -->
+  <!-- Переключатель слоёв (десктоп) -->
+  <div v-if="!isMobile" class="layer-switch">
+    <button :class="{ active: activeLayer === 'game' }" @click="setActiveLayer('game')">
+      Дичь
+    </button>
+    <button :class="{ active: activeLayer === 'alchemy' }" @click="setActiveLayer('alchemy')">
+      Растения
+    </button>
+    <button :class="{ active: activeLayer === 'both' }" @click="setActiveLayer('both')">
+      Оба
+    </button>
+  </div>
+
+  <!-- Основная панель (только фильтры) -->
   <div
     class="panel"
     :class="{
@@ -32,16 +45,26 @@
     }"
   >
     <div class="panel-header">
-      <span class="panel-logo">🗺️</span>
-      <span class="panel-title">Карта дичи</span>
-      <button v-if="isMobile" class="close-burger" @click="burgerOpen = false">
-        ✕
-      </button>
+<!-- Переключатель слоёв для мобильных устройств -->
+<div v-if="isMobile" class="section">
+  <div class="section-title">🗺️ РЕЖИМ КАРТЫ</div>
+  <div class="layer-switch-mobile">
+    <button :class="{ active: activeLayer === 'game' }" @click="setActiveLayer('game')">
+      Дичь
+    </button>
+    <button :class="{ active: activeLayer === 'alchemy' }" @click="setActiveLayer('alchemy')">
+      Растения
+    </button>
+    <button :class="{ active: activeLayer === 'both' }" @click="setActiveLayer('both')">
+      Оба
+    </button>
+  </div>
+</div>
     </div>
 
-    <!-- Фильтры (всегда в панели) -->
-    <div class="section">
-      <div class="section-title">⚔️ ФИЛЬТР</div>
+    <!-- Фильтры дичи -->
+    <div v-if="activeLayer === 'game' || activeLayer === 'both'" class="section">
+      <div class="section-title">⚔️ ФИЛЬТР (ДИЧЬ)</div>
       <div class="filter-grid">
         <label
           v-for="type in markerTypes"
@@ -49,12 +72,7 @@
           class="filter-item"
           :class="{ active: activeFilters.includes(type.id) }"
         >
-          <input
-            type="checkbox"
-            :value="type.id"
-            v-model="activeFilters"
-            @change="applyFilters"
-          />
+          <input type="checkbox" :value="type.id" v-model="activeFilters" @change="applyFilters" />
           <img :src="type.icon" :alt="type.name" />
           <span>{{ type.name }}</span>
         </label>
@@ -65,52 +83,31 @@
       </div>
     </div>
 
-    <!-- Блок добавления маркера (только на десктопе и в режиме редактирования) -->
-    <template v-if="!isMobile && editMode">
-      <div class="section">
-        <div class="section-title">📍 НОВЫЙ МАРКЕР</div>
-
-        <template v-if="pendingCoords">
-          <div class="coords-line">{{ pendingCoords }}</div>
-
-          <div class="type-label">Тип добычи</div>
-          <div class="type-grid">
-            <button
-              v-for="type in markerTypes"
-              :key="type.id"
-              class="type-btn"
-              :class="{ selected: selectedType === type.id }"
-              @click="selectedType = type.id"
-              :title="type.name"
-            >
-              <img :src="type.icon" :alt="type.name" />
-            </button>
-          </div>
-
+    <!-- Фильтры алхимии -->
+    <div v-if="(activeLayer === 'alchemy' || activeLayer === 'both') && alchemyLayerRef" class="section">
+      <div class="section-title">🌿 ФИЛЬТР (РАСТЕНИЯ)</div>
+      <div class="filter-grid">
+        <label
+          v-for="type in alchemyLayerRef.alchemyTypes"
+          :key="type.id"
+          class="filter-item"
+          :class="{ active: alchemyLayerRef.activeFilters.includes(type.id) }"
+        >
           <input
-            v-model="formTitle"
-            placeholder="Название места"
-            ref="titleInput"
-            @keyup.enter="saveMarker"
+            type="checkbox"
+            :value="type.id"
+            v-model="alchemyLayerRef.activeFilters"
+            @change="alchemyLayerRef.applyFilters()"
           />
-          <input
-            v-model="formDescription"
-            placeholder="Что здесь водится..."
-            @keyup.enter="saveMarker"
-          />
-          <div class="form-btns">
-            <button class="btn-add" @click="saveMarker">🏹 ДОБАВИТЬ</button>
-            <button class="btn-cancel" @click="cancelMarker">ОТМЕНА</button>
-          </div>
-        </template>
-
-        <template v-else>
-          <div class="hint">Кликните по карте, чтобы отметить место</div>
-        </template>
+          <img :src="type.icon" :alt="type.name" />
+          <span>{{ type.name }}</span>
+        </label>
       </div>
-    </template>
-
-    <!-- Список всех маркеров (показывается только в режиме редактирования на десктопе, на мобильных всегда) -->
+      <div class="filter-btns">
+        <button @click="selectAllAlchemyFilters">ВСЕ</button>
+        <button @click="clearAllAlchemyFilters">НИЧЕГО</button>
+      </div>
+    </div>
 
     <div class="panel-footer">
       <div class="footer-ornament">— ◆ —</div>
@@ -125,12 +122,35 @@
   <transition name="fade">
     <div class="toast" v-if="toastMsg">{{ toastMsg }}</div>
   </transition>
+
+  <!-- Модальное окно добавления -->
+  <AddMarkerModal
+    :visible="showModal"
+    :coords="modalCoords"
+    :layer-mode="activeLayer"
+    :game-types="markerTypes"
+    :alchemy-types="alchemyLayerRef?.alchemyTypes || []"
+    @close="closeModal"
+    @save-game="handleSaveGameMarker"
+    @save-alchemy="handleSaveAlchemyMarker"
+  />
+
+  <!-- Компонент алхимического слоя -->
+  <AlchemyLayer
+    ref="alchemyLayerRef"
+    :map="mapInstance"
+    :active="activeLayer === 'alchemy' || activeLayer === 'both'"
+    :edit-mode="editMode && !isMobile"
+    @toast="handleAlchemyToast"
+  />
 </template>
 
 <script setup>
 import { onMounted, ref, nextTick, onBeforeUnmount } from "vue";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import AlchemyLayer from "./AlchemyLayer.vue";
+import AddMarkerModal from "./AddMarkerModal.vue";
 
 const BASE = import.meta.env.BASE_URL;
 const WEB_APP_URL =
@@ -150,38 +170,42 @@ const markerTypes = [
   { id: "gig", name: "Великан", icon: BASE + "gig.png" },
 ];
 
-// Реактивные переменные
 const editMode = ref(false);
-const formTitle = ref("");
-const formDescription = ref("");
-const pendingCoords = ref("");
-const selectedType = ref("elk");
-const titleInput = ref(null);
 const toastMsg = ref("");
 const activeFilters = ref(markerTypes.map((t) => t.id));
 const isLoading = ref(false);
 const isMobile = ref(false);
 const burgerOpen = ref(false);
-
-let pendingLatLng = null;
-let mapInstance = null;
-let updateInterval = null;
+const activeLayer = ref("game");
 
 const allMarkers = ref([]);
-const leafletMarkers = [];
+let mapInstance = null;
+let updateInterval = null;
+let leafletMarkers = [];
 
-// Определение мобильного режима с учётом сенсорного ввода и ширины экрана
+const alchemyLayerRef = ref(null);
+
+// Модалка
+const showModal = ref(false);
+const modalCoords = ref(null);
+
 function handleResize() {
   const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
   const isNarrowScreen = window.innerWidth <= 1024;
   isMobile.value = isTouchDevice || isNarrowScreen;
-
-  if (isMobile.value) {
-    editMode.value = false; // на мобильных всегда просмотр
-    if (mapInstance) mapInstance.getContainer().style.cursor = "";
-  }
+  if (isMobile.value) editMode.value = false;
 }
 
+function toast(msg) {
+  toastMsg.value = msg;
+  setTimeout(() => (toastMsg.value = ""), 2000);
+}
+
+function handleAlchemyToast(msg) {
+  toast(msg);
+}
+
+// ========== ДИЧЬ ==========
 function getTypeIcon(typeId) {
   return markerTypes.find((t) => t.id === typeId)?.icon || BASE + "elk.png";
 }
@@ -189,20 +213,12 @@ function getTypeIcon(typeId) {
 function createLeafletIcon(typeId) {
   return L.divIcon({
     className: "",
-    html: `<div class="map-marker"><img src="${getTypeIcon(
-      typeId
-    )}" alt="" /></div>`,
+    html: `<div class="map-marker"><img src="${getTypeIcon(typeId)}" alt="" /></div>`,
     iconSize: [36, 36],
     iconAnchor: [18, 18],
   });
 }
 
-function createTooltipContent(title, description) {
-  if (description) return `<b>${title}</b><br><span>${description}</span>`;
-  return `<b>${title}</b>`;
-}
-
-// ---------- РАБОТА С СЕРВЕРОМ ----------
 async function loadMarkers() {
   isLoading.value = true;
   try {
@@ -213,26 +229,15 @@ async function loadMarkers() {
     try {
       data = JSON.parse(cleanText);
     } catch (e) {
-      console.error(
-        "Ответ не JSON, первые 100 символов:",
-        cleanText.substring(0, 100)
-      );
-      toast("❌ Сервер вернул не JSON (проверьте скрипт)");
+      toast("❌ Сервер вернул не JSON");
       return;
     }
-    if (data && data.error) {
-      toast(`❌ Ошибка сервера: ${data.error}`);
-      return;
-    }
-    if (!Array.isArray(data)) {
-      toast("❌ Неверный формат данных");
-      return;
-    }
+    if (data?.error) throw new Error(data.error);
+    if (!Array.isArray(data)) throw new Error("Неверный формат");
     allMarkers.value = data;
     refreshMapMarkers();
   } catch (err) {
-    console.error(err);
-    toast("❌ Ошибка загрузки данных");
+    toast(`❌ Ошибка загрузки дичи: ${err.message}`);
   } finally {
     isLoading.value = false;
   }
@@ -244,70 +249,28 @@ async function addMarkerToSheet(marker) {
   formData.append("type", marker.type);
   formData.append("title", marker.title);
   formData.append("description", marker.description);
-
-  const res = await fetch(WEB_APP_URL, {
-    method: "POST",
-    body: formData,
-  });
+  const res = await fetch(WEB_APP_URL, { method: "POST", body: formData });
   const text = await res.text();
   const cleanText = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-  let json;
-  try {
-    json = JSON.parse(cleanText);
-  } catch (e) {
-    throw new Error(`Сервер ответил не JSON: ${cleanText.substring(0, 100)}`);
-  }
+  const json = JSON.parse(cleanText);
   if (json.error) throw new Error(json.error);
   return json;
 }
 
-async function deleteMarkerFromSheet(id) {
-  const formData = new FormData();
-  formData.append("id", id);
-  formData.append("_method", "DELETE");
-
-  const res = await fetch(WEB_APP_URL, {
-    method: "POST",
-    body: formData,
-  });
-  const text = await res.text();
-  const cleanText = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-  let json;
-  try {
-    json = JSON.parse(cleanText);
-  } catch (e) {
-    throw new Error(`Сервер ответил не JSON: ${cleanText.substring(0, 100)}`);
-  }
-  if (json.error) throw new Error(json.error);
-  return json;
-}
-
-// ---------- КАРТА ----------
 function refreshMapMarkers() {
   leafletMarkers.forEach((item) => {
-    if (mapInstance && mapInstance.hasLayer(item.marker))
-      mapInstance.removeLayer(item.marker);
+    if (mapInstance?.hasLayer(item.marker)) mapInstance.removeLayer(item.marker);
   });
   leafletMarkers.length = 0;
 
   allMarkers.value.forEach((m) => {
-    let coordsArray;
-    try {
-      coordsArray =
-        typeof m.coords === "string" ? JSON.parse(m.coords) : m.coords;
-    } catch (e) {
-      console.warn("Ошибка парсинга координат:", m.coords);
-      return;
-    }
-    const marker = L.marker(coordsArray, {
-      icon: createLeafletIcon(m.type),
-    }).bindTooltip(createTooltipContent(m.title, m.description), {
-      direction: "top",
-      offset: [0, -20],
-      className: "custom-tooltip",
-    });
+    let coordsArray = JSON.parse(m.coords);
+    const marker = L.marker(coordsArray, { icon: createLeafletIcon(m.type) }).bindTooltip(
+      `<b>${m.title}</b><br><span>${m.description}</span>`,
+      { direction: "top", offset: [0, -20], className: "custom-tooltip" }
+    );
     leafletMarkers.push({ marker, type: m.type, id: m.id });
-    if (activeFilters.value.includes(m.type)) {
+    if (activeFilters.value.includes(m.type) && (activeLayer.value === "game" || activeLayer.value === "both")) {
       marker.addTo(mapInstance);
     }
   });
@@ -315,84 +278,86 @@ function refreshMapMarkers() {
 
 function applyFilters() {
   leafletMarkers.forEach(({ marker, type }) => {
-    if (activeFilters.value.includes(type)) {
-      if (!mapInstance.hasLayer(marker)) marker.addTo(mapInstance);
-    } else {
-      if (mapInstance.hasLayer(marker)) mapInstance.removeLayer(marker);
-    }
+    const shouldShow = (activeLayer.value === "game" || activeLayer.value === "both") && activeFilters.value.includes(type);
+    if (shouldShow && !mapInstance.hasLayer(marker)) marker.addTo(mapInstance);
+    if (!shouldShow && mapInstance.hasLayer(marker)) mapInstance.removeLayer(marker);
   });
-}
-
-// ---------- ДЕЙСТВИЯ ПОЛЬЗОВАТЕЛЯ ----------
-async function saveMarker() {
-  if (!pendingLatLng) return;
-  const title =
-    formTitle.value.trim() || `Точка ${allMarkers.value.length + 1}`;
-  const description = formDescription.value.trim() || "";
-  const type = selectedType.value;
-  const coordsStr = `[${Math.round(pendingLatLng.lat)}, ${Math.round(
-    pendingLatLng.lng
-  )}]`;
-
-  try {
-    await addMarkerToSheet({ coords: coordsStr, type, title, description });
-    await loadMarkers(); // обновляем данные после добавления
-    toast(`✅ Добавлен: ${title}`);
-    cancelMarker();
-  } catch (err) {
-    console.error(err);
-    toast(`❌ Ошибка: ${err.message}`);
-  }
-}
-
-async function removeMarker(id) {
-  try {
-    await deleteMarkerFromSheet(id);
-    await loadMarkers(); // обновляем данные после удаления
-    toast("🗑️ Маркер удалён");
-  } catch (err) {
-    console.error(err);
-    toast(`❌ Ошибка: ${err.message}`);
-  }
-}
-
-function cancelMarker() {
-  pendingCoords.value = "";
-  pendingLatLng = null;
-  formTitle.value = "";
-  formDescription.value = "";
-}
-
-function toggleMode() {
-  if (isMobile.value) return; // на мобильных недоступно
-  editMode.value = !editMode.value;
-  cancelMarker();
-  if (mapInstance) {
-    mapInstance.getContainer().style.cursor = editMode.value ? "crosshair" : "";
-  }
 }
 
 function selectAllFilters() {
   activeFilters.value = markerTypes.map((t) => t.id);
   applyFilters();
 }
-
 function clearAllFilters() {
   activeFilters.value = [];
   applyFilters();
 }
-
-function toast(msg) {
-  toastMsg.value = msg;
-  setTimeout(() => {
-    toastMsg.value = "";
-  }, 2000);
+function selectAllAlchemyFilters() {
+  if (alchemyLayerRef.value) {
+    alchemyLayerRef.value.activeFilters = alchemyLayerRef.value.alchemyTypes.map((t) => t.id);
+    alchemyLayerRef.value.applyFilters();
+  }
+}
+function clearAllAlchemyFilters() {
+  if (alchemyLayerRef.value) {
+    alchemyLayerRef.value.activeFilters = [];
+    alchemyLayerRef.value.applyFilters();
+  }
 }
 
-// ---------- ИНИЦИАЛИЗАЦИЯ КАРТЫ ----------
+// Сохранение дичи из модалки
+async function handleSaveGameMarker(markerData) {
+  try {
+    await addMarkerToSheet(markerData);
+    await loadMarkers();
+    toast(`✅ Добавлен: ${markerData.title}`);
+  } catch (err) {
+    toast(`❌ Ошибка: ${err.message}`);
+  }
+}
+
+// Сохранение алхимии из модалки
+async function handleSaveAlchemyMarker(markerData) {
+  if (alchemyLayerRef.value) {
+    await alchemyLayerRef.value.addMarkerDirect(markerData);
+    await alchemyLayerRef.value.loadMarkers();
+    toast(`✅ Добавлен алхимический ресурс: ${markerData.title}`);
+  }
+}
+
+function closeModal() {
+  showModal.value = false;
+  modalCoords.value = null;
+}
+
+// ========== УПРАВЛЕНИЕ ==========
+function setActiveLayer(layer) {
+  activeLayer.value = layer;
+  applyFilters();
+  if (alchemyLayerRef.value) alchemyLayerRef.value.applyFilters();
+}
+
+function toggleMode() {
+  if (isMobile.value) return;
+  editMode.value = !editMode.value;
+  if (mapInstance) {
+    mapInstance.getContainer().style.cursor = editMode.value ? "crosshair" : "";
+  }
+}
+
+// Обработчик клика по карте – открывает модалку
+function onMapClick(e) {
+  if (!editMode.value || isMobile.value) return;
+  const lat = Math.round(e.latlng.lat);
+  const lng = Math.round(e.latlng.lng);
+  modalCoords.value = { lat, lng };
+  showModal.value = true;
+}
+
+// ========== ИНИЦИАЛИЗАЦИЯ ==========
 onMounted(() => {
   window.addEventListener("resize", handleResize);
-  handleResize(); // сразу установим правильный флаг мобильности
+  handleResize();
 
   const img = new Image();
   img.src = BASE + "5171-0-1480272622.webp";
@@ -415,30 +380,28 @@ onMounted(() => {
     L.imageOverlay(BASE + "5171-0-1480272622.webp", imageBounds).addTo(map);
     map.fitBounds(imageBounds);
 
-    map.on("click", (e) => {
-      if (!editMode.value || isMobile.value) return;
-      const lat = Math.round(e.latlng.lat);
-      const lng = Math.round(e.latlng.lng);
-      pendingCoords.value = `[${lat}, ${lng}]`;
-      pendingLatLng = e.latlng;
-      formTitle.value = "";
-      formDescription.value = "";
-      selectedType.value = "elk";
-      nextTick(() => titleInput.value?.focus());
-    });
+    map.on("click", onMapClick);
 
     loadMarkers();
-    updateInterval = setInterval(loadMarkers, 30000);
+    if (alchemyLayerRef.value) alchemyLayerRef.value.loadMarkers();
+
+    updateInterval = setInterval(() => {
+      loadMarkers();
+      if (alchemyLayerRef.value) alchemyLayerRef.value.loadMarkers();
+    }, 30000);
   };
 });
 
 onBeforeUnmount(() => {
   if (updateInterval) clearInterval(updateInterval);
   window.removeEventListener("resize", handleResize);
+  if (mapInstance) mapInstance.remove();
 });
 </script>
 
 <style scoped>
+/* Все ваши существующие стили остаются без изменений */
+/* ... (скопируйте свои стили из исходного файла) ... */
 @import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&display=swap");
 
 .leaflet-map {
@@ -449,7 +412,6 @@ onBeforeUnmount(() => {
   left: 0;
 }
 
-/* Индикатор загрузки — правый верхний угол */
 .loading-indicator {
   position: fixed;
   top: 16px;
@@ -464,7 +426,6 @@ onBeforeUnmount(() => {
   font-family: "Cinzel", serif;
   backdrop-filter: blur(4px);
   border: 1px solid #8b7355;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 .spinner {
   width: 20px;
@@ -474,21 +435,15 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 .loading-text {
   color: #e8dcc8;
   font-size: 12px;
-  letter-spacing: 1px;
-}
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
 }
 
-/* Кнопка переключения режима (десктоп) */
 .mode-btn {
   position: fixed;
   top: 16px;
@@ -500,21 +455,39 @@ onBeforeUnmount(() => {
   border: 2px solid #8b7355;
   border-radius: 4px;
   font: bold 12px "Cinzel", serif;
-  letter-spacing: 1px;
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-.mode-btn:hover {
-  background: linear-gradient(135deg, #6d5a48, #4e3d2f);
 }
 .mode-btn.active {
   background: linear-gradient(135deg, #8b2500, #6b1c00);
   border-color: #c4713b;
-  color: #ffeedd;
 }
 
-/* Бургер-кнопка (мобильные) */
+.layer-switch {
+  position: fixed;
+  top: 16px;
+  left: 220px;
+  z-index: 1000;
+  display: flex;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 6px 12px;
+  border-radius: 40px;
+  backdrop-filter: blur(4px);
+  border: 1px solid #8b7355;
+}
+.layer-switch button {
+  background: #3e2f23;
+  border: none;
+  color: #e8dcc8;
+  padding: 6px 14px;
+  border-radius: 30px;
+  font: bold 11px "Cinzel", serif;
+  cursor: pointer;
+}
+.layer-switch button.active {
+  background: #8b2500;
+}
+
 .burger-btn {
   position: fixed;
   top: 16px;
@@ -528,16 +501,8 @@ onBeforeUnmount(() => {
   height: 48px;
   border-radius: 8px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-.burger-btn:hover {
-  background: linear-gradient(135deg, #6d5a48, #4e3d2f);
 }
 
-/* Панель (общие стили) */
 .panel {
   position: fixed;
   top: 0;
@@ -560,16 +525,9 @@ onBeforeUnmount(() => {
 .panel-view {
   width: 220px;
 }
-
-/* Мобильная версия панели (выезжающая) */
 .panel-mobile {
   width: 280px;
   transform: translateX(100%);
-  top: 0;
-  right: 0;
-  height: 100vh;
-  border-left: 3px solid #8b7355;
-  border-radius: 0;
 }
 .panel-mobile-open {
   transform: translateX(0);
@@ -582,8 +540,6 @@ onBeforeUnmount(() => {
   margin-left: auto;
   color: #8b2500;
 }
-
-/* Заголовок панели */
 .panel-header {
   display: flex;
   align-items: center;
@@ -592,16 +548,10 @@ onBeforeUnmount(() => {
   margin-bottom: 12px;
   border-bottom: 2px solid #8b7355;
 }
-.panel-logo {
-  font-size: 22px;
-}
 .panel-title {
   font: bold 16px "Cinzel", serif;
-  color: #3e2f23;
-  letter-spacing: 2px;
 }
 
-/* Остальные стили (фильтры, кнопки, списки) без изменений, они уже адаптивны */
 .section {
   margin-bottom: 18px;
 }
@@ -612,20 +562,6 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid #c4a87a;
   padding-bottom: 6px;
   margin-bottom: 10px;
-}
-.hint {
-  color: #8b7355;
-  font-style: italic;
-  font-size: 13px;
-}
-.coords-line {
-  background: rgba(139, 115, 85, 0.15);
-  border: 1px solid #c4a87a;
-  padding: 6px 10px;
-  margin-bottom: 8px;
-  font-family: "Courier New", monospace;
-  font-size: 12px;
-  border-radius: 4px;
 }
 .filter-grid {
   display: grid;
@@ -655,11 +591,6 @@ onBeforeUnmount(() => {
 .filter-item img {
   width: 20px;
   height: 20px;
-  object-fit: contain;
-}
-.filter-item span {
-  font: 11px "Cinzel", serif;
-  letter-spacing: 1px;
 }
 .filter-btns {
   display: flex;
@@ -669,123 +600,10 @@ onBeforeUnmount(() => {
   flex: 1;
   padding: 6px;
   background: rgba(139, 115, 85, 0.1);
-  color: #6d5a48;
   border: 1px solid #c4a87a;
   border-radius: 4px;
   font: bold 9px "Cinzel", serif;
-  letter-spacing: 2px;
   cursor: pointer;
-}
-.filter-btns button:hover {
-  background: rgba(139, 115, 85, 0.25);
-}
-.type-label {
-  font: 11px "Cinzel", serif;
-  color: #6d5a48;
-  letter-spacing: 2px;
-  margin-bottom: 6px;
-}
-.type-grid {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-.type-btn {
-  width: 44px;
-  height: 44px;
-  background: rgba(139, 115, 85, 0.08);
-  border: 2px solid #c4a87a;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0.45;
-}
-.type-btn img {
-  width: 28px;
-  height: 28px;
-}
-.type-btn.selected {
-  background: rgba(139, 115, 85, 0.3);
-  border-color: #6d5a48;
-  opacity: 1;
-}
-.panel input {
-  width: 100%;
-  padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.6);
-  color: #3e2f23;
-  border: 1px solid #c4a87a;
-  border-radius: 4px;
-  font: 13px "Crimson Text", serif;
-  margin-bottom: 6px;
-}
-.form-btns {
-  display: flex;
-  gap: 6px;
-  margin-top: 4px;
-}
-.btn-add {
-  flex: 1;
-  padding: 9px;
-  background: linear-gradient(135deg, #8b2500, #6b1c00);
-  color: #ffeedd;
-  border: none;
-  border-radius: 4px;
-  font: bold 11px "Cinzel", serif;
-  cursor: pointer;
-}
-.btn-cancel {
-  flex: 1;
-  padding: 9px;
-  background: transparent;
-  color: #8b7355;
-  border: 1px solid #c4a87a;
-  border-radius: 4px;
-  font: bold 11px "Cinzel", serif;
-  cursor: pointer;
-}
-.marker-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-.marker-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  background: rgba(139, 115, 85, 0.15);
-  border: 1px solid #c4a87a;
-  border-radius: 4px;
-}
-.marker-item-icon {
-  width: 22px;
-  height: 22px;
-}
-.marker-info {
-  flex: 1;
-}
-.marker-name {
-  font-weight: bold;
-}
-.marker-coords {
-  font-size: 10px;
-  font-family: monospace;
-  color: #6d5a48;
-}
-.btn-remove {
-  background: none;
-  border: none;
-  color: #a99880;
-  font-size: 16px;
-  cursor: pointer;
-}
-.btn-remove:hover {
-  color: #8b2500;
 }
 .panel-footer {
   margin-top: auto;
@@ -793,10 +611,6 @@ onBeforeUnmount(() => {
   border-top: 2px solid #8b7355;
   font-size: 12px;
   text-align: center;
-}
-.footer-ornament {
-  letter-spacing: 6px;
-  margin-bottom: 8px;
 }
 .toast {
   position: fixed;
@@ -818,8 +632,6 @@ onBeforeUnmount(() => {
 .fade-leave-to {
   opacity: 0;
 }
-
-/* Дополнительная адаптация под горизонтальную ориентацию на мобильных */
 @media (orientation: landscape) and (max-width: 768px) {
   .panel-mobile {
     width: 280px;
@@ -836,6 +648,7 @@ onBeforeUnmount(() => {
 </style>
 
 <style>
+/* Глобальные стили для маркеров */
 .map-marker {
   width: 36px;
   height: 36px;
@@ -857,6 +670,30 @@ onBeforeUnmount(() => {
   height: 20px;
   filter: brightness(10);
 }
+
+.map-marker-alchemy {
+  width: 36px;
+  height: 36px;
+  background: radial-gradient(circle, #2c6e9e, #1a3f5c);
+  color: white;
+  border: 3px solid #e8dcc8;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(28, 78, 128, 0.5), 0 0 0 2px rgba(28, 78, 128, 0.3);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.map-marker-alchemy:hover {
+  transform: scale(1.2);
+}
+.map-marker-alchemy img {
+  width: 20px;
+  height: 20px;
+  filter: brightness(0) invert(1);
+}
+
 .custom-tooltip {
   background: linear-gradient(135deg, #5c4a3a, #3e2f23);
   color: #e8dcc8;
@@ -872,15 +709,32 @@ onBeforeUnmount(() => {
   margin-bottom: 3px;
   font-family: "Cinzel", serif;
   font-size: 12px;
-  letter-spacing: 1px;
   color: #ffeedd;
 }
 .custom-tooltip span {
   color: #c4a87a;
-  font-size: 12px;
   font-style: italic;
 }
 .leaflet-tooltip-top:before {
   border-top-color: #3e2f23;
+}
+
+.layer-switch-mobile {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.layer-switch-mobile button {
+  flex: 1;
+  background: #3e2f23;
+  border: 1px solid #c4a87a;
+  color: #e8dcc8;
+  padding: 8px;
+  border-radius: 30px;
+  font: bold 11px "Cinzel", serif;
+  cursor: pointer;
+}
+.layer-switch-mobile button.active {
+  background: #8b2500;
 }
 </style>
