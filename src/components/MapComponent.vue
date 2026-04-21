@@ -142,7 +142,7 @@ const markerTypes = [
   { id: "rat", name: "Крыса", icon: BASE + "rat.png" },
   { id: "bear", name: "Медведь", icon: BASE + "bear.png" },
   { id: "troll", name: "Тролль", icon: BASE + "troll.png" },
-  { id: "sabertooth", name: "sabertooth", icon: BASE + "cat.png" },
+  { id: "sabertooth", name: "Саблезуб", icon: BASE + "cat.png" },
   { id: "spider", name: "Паук", icon: BASE + "spider.png" },
   { id: "scorpio", name: "Корус", icon: BASE + "scorpio.png" },
   { id: "snake", name: "Змея", icon: BASE + "snake.png" },
