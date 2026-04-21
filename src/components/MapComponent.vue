@@ -13,16 +13,30 @@
   </button>
 
   <!-- Кнопка переключения режима (только на десктопе) -->
-  <button v-if="!isMobile" class="mode-btn" :class="{ active: editMode }" @click="toggleMode">
-    {{ editMode ? '🏹 Расставляем' : '👁️ Смотрим' }}
+  <button
+    v-if="!isMobile"
+    class="mode-btn"
+    :class="{ active: editMode }"
+    @click="toggleMode"
+  >
+    {{ editMode ? "🏹 Расставляем" : "👁️ Смотрим" }}
   </button>
 
   <!-- Основная панель (на десктопе всегда справа, на мобильных - выезжающий бургер) -->
-  <div class="panel" :class="{ 'panel-mobile': isMobile, 'panel-mobile-open': burgerOpen, 'panel-view': !editMode && !isMobile }">
+  <div
+    class="panel"
+    :class="{
+      'panel-mobile': isMobile,
+      'panel-mobile-open': burgerOpen,
+      'panel-view': !editMode && !isMobile,
+    }"
+  >
     <div class="panel-header">
       <span class="panel-logo">🗺️</span>
       <span class="panel-title">Карта дичи</span>
-      <button v-if="isMobile" class="close-burger" @click="burgerOpen = false">✕</button>
+      <button v-if="isMobile" class="close-burger" @click="burgerOpen = false">
+        ✕
+      </button>
     </div>
 
     <!-- Фильтры (всегда в панели) -->
@@ -35,7 +49,12 @@
           class="filter-item"
           :class="{ active: activeFilters.includes(type.id) }"
         >
-          <input type="checkbox" :value="type.id" v-model="activeFilters" @change="applyFilters" />
+          <input
+            type="checkbox"
+            :value="type.id"
+            v-model="activeFilters"
+            @change="applyFilters"
+          />
           <img :src="type.icon" :alt="type.name" />
           <span>{{ type.name }}</span>
         </label>
@@ -93,11 +112,10 @@
 
     <!-- Список всех маркеров (показывается только в режиме редактирования на десктопе, на мобильных всегда) -->
 
-
     <div class="panel-footer">
       <div class="footer-ornament">— ◆ —</div>
-      Данные синхронизируются с Google Таблицей<br>
-      <strong>Багрепорт в Discord:</strong><br>
+      Данные синхронизируются с Google Таблицей<br />
+      <strong>Багрепорт в Discord:</strong><br />
       <a href="https://discord.com/users/mashrooooooooms" target="_blank">
         mashrooooooooms
       </a>
@@ -110,37 +128,42 @@
 </template>
 
 <script setup>
-import { onMounted, ref, nextTick, onBeforeUnmount } from 'vue';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { onMounted, ref, nextTick, onBeforeUnmount } from "vue";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 const BASE = import.meta.env.BASE_URL;
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzYoW5mKzznhmrygbOC9g8bITiNKQWRTaGKVSqJ8n4PLdYe2wqB47S656fTK_xIieLYJA/exec';
+const WEB_APP_URL =
+  "https://script.google.com/macros/s/AKfycbzYoW5mKzznhmrygbOC9g8bITiNKQWRTaGKVSqJ8n4PLdYe2wqB47S656fTK_xIieLYJA/exec";
 
 const markerTypes = [
-  { id: 'elk',        name: 'Олень',    icon: BASE + 'elk.png' },
-  { id: 'wolf',       name: 'Волк',     icon: BASE + 'wolf.png' },
-  { id: 'rat',        name: 'Крыса',    icon: BASE + 'rat.png' },
-  { id: 'bear',       name: 'Медведь',  icon: BASE + 'bear.png' },
-  { id: 'troll',      name: 'Тролль',   icon: BASE + 'troll.png' },
-  { id: 'sabertooth', name: 'Саблезуб', icon: BASE + 'cat.png' },
+  { id: "elk", name: "Олень", icon: BASE + "elk.png" },
+  { id: "wolf", name: "Волк", icon: BASE + "wolf.png" },
+  { id: "rat", name: "Крыса", icon: BASE + "rat.png" },
+  { id: "bear", name: "Медведь", icon: BASE + "bear.png" },
+  { id: "troll", name: "Тролль", icon: BASE + "troll.png" },
+  { id: "spider", name: "Паук", icon: BASE + "spider.png" },
+  { id: "scorpio", name: "Корус", icon: BASE + "scorpio.png" },
+  { id: "snake", name: "Змея", icon: BASE + "snake.png" },
+  { id: "eleph", name: "Мамонт", icon: BASE + "eleph.png" },
+  { id: "gig", name: "Великан", icon: BASE + "gig.png" },
 ];
 
 // Реактивные переменные
-const editMode        = ref(false);
-const formTitle       = ref('');
-const formDescription = ref('');
-const pendingCoords   = ref('');
-const selectedType    = ref('elk');
-const titleInput      = ref(null);
-const toastMsg        = ref('');
-const activeFilters   = ref(markerTypes.map(t => t.id));
-const isLoading       = ref(false);
-const isMobile        = ref(false);
-const burgerOpen      = ref(false);
+const editMode = ref(false);
+const formTitle = ref("");
+const formDescription = ref("");
+const pendingCoords = ref("");
+const selectedType = ref("elk");
+const titleInput = ref(null);
+const toastMsg = ref("");
+const activeFilters = ref(markerTypes.map((t) => t.id));
+const isLoading = ref(false);
+const isMobile = ref(false);
+const burgerOpen = ref(false);
 
 let pendingLatLng = null;
-let mapInstance   = null;
+let mapInstance = null;
 let updateInterval = null;
 
 const allMarkers = ref([]);
@@ -148,24 +171,26 @@ const leafletMarkers = [];
 
 // Определение мобильного режима с учётом сенсорного ввода и ширины экрана
 function handleResize() {
-  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+  const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
   const isNarrowScreen = window.innerWidth <= 1024;
   isMobile.value = isTouchDevice || isNarrowScreen;
 
   if (isMobile.value) {
     editMode.value = false; // на мобильных всегда просмотр
-    if (mapInstance) mapInstance.getContainer().style.cursor = '';
+    if (mapInstance) mapInstance.getContainer().style.cursor = "";
   }
 }
 
 function getTypeIcon(typeId) {
-  return markerTypes.find(t => t.id === typeId)?.icon || BASE + 'elk.png';
+  return markerTypes.find((t) => t.id === typeId)?.icon || BASE + "elk.png";
 }
 
 function createLeafletIcon(typeId) {
   return L.divIcon({
-    className: '',
-    html: `<div class="map-marker"><img src="${getTypeIcon(typeId)}" alt="" /></div>`,
+    className: "",
+    html: `<div class="map-marker"><img src="${getTypeIcon(
+      typeId
+    )}" alt="" /></div>`,
     iconSize: [36, 36],
     iconAnchor: [18, 18],
   });
@@ -182,13 +207,16 @@ async function loadMarkers() {
   try {
     const res = await fetch(WEB_APP_URL);
     const text = await res.text();
-    const cleanText = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+    const cleanText = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
     let data;
     try {
       data = JSON.parse(cleanText);
     } catch (e) {
-      console.error('Ответ не JSON, первые 100 символов:', cleanText.substring(0, 100));
-      toast('❌ Сервер вернул не JSON (проверьте скрипт)');
+      console.error(
+        "Ответ не JSON, первые 100 символов:",
+        cleanText.substring(0, 100)
+      );
+      toast("❌ Сервер вернул не JSON (проверьте скрипт)");
       return;
     }
     if (data && data.error) {
@@ -196,14 +224,14 @@ async function loadMarkers() {
       return;
     }
     if (!Array.isArray(data)) {
-      toast('❌ Неверный формат данных');
+      toast("❌ Неверный формат данных");
       return;
     }
     allMarkers.value = data;
     refreshMapMarkers();
   } catch (err) {
     console.error(err);
-    toast('❌ Ошибка загрузки данных');
+    toast("❌ Ошибка загрузки данных");
   } finally {
     isLoading.value = false;
   }
@@ -211,17 +239,17 @@ async function loadMarkers() {
 
 async function addMarkerToSheet(marker) {
   const formData = new FormData();
-  formData.append('coords', marker.coords);
-  formData.append('type', marker.type);
-  formData.append('title', marker.title);
-  formData.append('description', marker.description);
+  formData.append("coords", marker.coords);
+  formData.append("type", marker.type);
+  formData.append("title", marker.title);
+  formData.append("description", marker.description);
 
   const res = await fetch(WEB_APP_URL, {
-    method: 'POST',
+    method: "POST",
     body: formData,
   });
   const text = await res.text();
-  const cleanText = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+  const cleanText = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   let json;
   try {
     json = JSON.parse(cleanText);
@@ -234,15 +262,15 @@ async function addMarkerToSheet(marker) {
 
 async function deleteMarkerFromSheet(id) {
   const formData = new FormData();
-  formData.append('id', id);
-  formData.append('_method', 'DELETE');
+  formData.append("id", id);
+  formData.append("_method", "DELETE");
 
   const res = await fetch(WEB_APP_URL, {
-    method: 'POST',
+    method: "POST",
     body: formData,
   });
   const text = await res.text();
-  const cleanText = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+  const cleanText = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   let json;
   try {
     json = JSON.parse(cleanText);
@@ -255,25 +283,27 @@ async function deleteMarkerFromSheet(id) {
 
 // ---------- КАРТА ----------
 function refreshMapMarkers() {
-  leafletMarkers.forEach(item => {
-    if (mapInstance && mapInstance.hasLayer(item.marker)) mapInstance.removeLayer(item.marker);
+  leafletMarkers.forEach((item) => {
+    if (mapInstance && mapInstance.hasLayer(item.marker))
+      mapInstance.removeLayer(item.marker);
   });
   leafletMarkers.length = 0;
 
-  allMarkers.value.forEach(m => {
+  allMarkers.value.forEach((m) => {
     let coordsArray;
     try {
-      coordsArray = typeof m.coords === 'string' ? JSON.parse(m.coords) : m.coords;
+      coordsArray =
+        typeof m.coords === "string" ? JSON.parse(m.coords) : m.coords;
     } catch (e) {
-      console.warn('Ошибка парсинга координат:', m.coords);
+      console.warn("Ошибка парсинга координат:", m.coords);
       return;
     }
     const marker = L.marker(coordsArray, {
       icon: createLeafletIcon(m.type),
     }).bindTooltip(createTooltipContent(m.title, m.description), {
-      direction: 'top',
+      direction: "top",
       offset: [0, -20],
-      className: 'custom-tooltip',
+      className: "custom-tooltip",
     });
     leafletMarkers.push({ marker, type: m.type, id: m.id });
     if (activeFilters.value.includes(m.type)) {
@@ -295,10 +325,13 @@ function applyFilters() {
 // ---------- ДЕЙСТВИЯ ПОЛЬЗОВАТЕЛЯ ----------
 async function saveMarker() {
   if (!pendingLatLng) return;
-  const title = formTitle.value.trim() || `Точка ${allMarkers.value.length + 1}`;
-  const description = formDescription.value.trim() || '';
+  const title =
+    formTitle.value.trim() || `Точка ${allMarkers.value.length + 1}`;
+  const description = formDescription.value.trim() || "";
   const type = selectedType.value;
-  const coordsStr = `[${Math.round(pendingLatLng.lat)}, ${Math.round(pendingLatLng.lng)}]`;
+  const coordsStr = `[${Math.round(pendingLatLng.lat)}, ${Math.round(
+    pendingLatLng.lng
+  )}]`;
 
   try {
     await addMarkerToSheet({ coords: coordsStr, type, title, description });
@@ -315,7 +348,7 @@ async function removeMarker(id) {
   try {
     await deleteMarkerFromSheet(id);
     await loadMarkers(); // обновляем данные после удаления
-    toast('🗑️ Маркер удалён');
+    toast("🗑️ Маркер удалён");
   } catch (err) {
     console.error(err);
     toast(`❌ Ошибка: ${err.message}`);
@@ -323,10 +356,10 @@ async function removeMarker(id) {
 }
 
 function cancelMarker() {
-  pendingCoords.value = '';
+  pendingCoords.value = "";
   pendingLatLng = null;
-  formTitle.value = '';
-  formDescription.value = '';
+  formTitle.value = "";
+  formDescription.value = "";
 }
 
 function toggleMode() {
@@ -334,12 +367,12 @@ function toggleMode() {
   editMode.value = !editMode.value;
   cancelMarker();
   if (mapInstance) {
-    mapInstance.getContainer().style.cursor = editMode.value ? 'crosshair' : '';
+    mapInstance.getContainer().style.cursor = editMode.value ? "crosshair" : "";
   }
 }
 
 function selectAllFilters() {
-  activeFilters.value = markerTypes.map(t => t.id);
+  activeFilters.value = markerTypes.map((t) => t.id);
   applyFilters();
 }
 
@@ -350,22 +383,27 @@ function clearAllFilters() {
 
 function toast(msg) {
   toastMsg.value = msg;
-  setTimeout(() => { toastMsg.value = ''; }, 2000);
+  setTimeout(() => {
+    toastMsg.value = "";
+  }, 2000);
 }
 
 // ---------- ИНИЦИАЛИЗАЦИЯ КАРТЫ ----------
 onMounted(() => {
-  window.addEventListener('resize', handleResize);
+  window.addEventListener("resize", handleResize);
   handleResize(); // сразу установим правильный флаг мобильности
 
   const img = new Image();
-  img.src = BASE + '5171-0-1480272622.webp';
+  img.src = BASE + "5171-0-1480272622.webp";
   img.onload = () => {
     const boundsH = 1000;
     const boundsW = (img.naturalWidth / img.naturalHeight) * boundsH;
-    const imageBounds = [[0, 0], [boundsH, boundsW]];
+    const imageBounds = [
+      [0, 0],
+      [boundsH, boundsW],
+    ];
 
-    const map = L.map('map', {
+    const map = L.map("map", {
       crs: L.CRS.Simple,
       minZoom: -10,
       maxZoom: 10,
@@ -373,18 +411,18 @@ onMounted(() => {
       attributionControl: false,
     });
     mapInstance = map;
-    L.imageOverlay(BASE + '5171-0-1480272622.webp', imageBounds).addTo(map);
+    L.imageOverlay(BASE + "5171-0-1480272622.webp", imageBounds).addTo(map);
     map.fitBounds(imageBounds);
 
-    map.on('click', (e) => {
+    map.on("click", (e) => {
       if (!editMode.value || isMobile.value) return;
       const lat = Math.round(e.latlng.lat);
       const lng = Math.round(e.latlng.lng);
       pendingCoords.value = `[${lat}, ${lng}]`;
       pendingLatLng = e.latlng;
-      formTitle.value = '';
-      formDescription.value = '';
-      selectedType.value = 'elk';
+      formTitle.value = "";
+      formDescription.value = "";
+      selectedType.value = "elk";
       nextTick(() => titleInput.value?.focus());
     });
 
@@ -395,12 +433,12 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (updateInterval) clearInterval(updateInterval);
-  window.removeEventListener('resize', handleResize);
+  window.removeEventListener("resize", handleResize);
 });
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital@0;1&display=swap");
 
 .leaflet-map {
   width: 100vw;
@@ -422,7 +460,7 @@ onBeforeUnmount(() => {
   background: rgba(0, 0, 0, 0.7);
   padding: 8px 12px;
   border-radius: 8px;
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   backdrop-filter: blur(4px);
   border: 1px solid #8b7355;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -441,8 +479,12 @@ onBeforeUnmount(() => {
   letter-spacing: 1px;
 }
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Кнопка переключения режима (десктоп) */
@@ -456,7 +498,7 @@ onBeforeUnmount(() => {
   color: #e8dcc8;
   border: 2px solid #8b7355;
   border-radius: 4px;
-  font: bold 12px 'Cinzel', serif;
+  font: bold 12px "Cinzel", serif;
   letter-spacing: 1px;
   cursor: pointer;
   transition: all 0.2s;
@@ -488,7 +530,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 .burger-btn:hover {
   background: linear-gradient(135deg, #6d5a48, #4e3d2f);
@@ -507,7 +549,7 @@ onBeforeUnmount(() => {
   border-left: 3px solid #8b7355;
   padding: 16px;
   overflow-y: auto;
-  font-family: 'Crimson Text', serif;
+  font-family: "Crimson Text", serif;
   font-size: 14px;
   display: flex;
   flex-direction: column;
@@ -553,7 +595,7 @@ onBeforeUnmount(() => {
   font-size: 22px;
 }
 .panel-title {
-  font: bold 16px 'Cinzel', serif;
+  font: bold 16px "Cinzel", serif;
   color: #3e2f23;
   letter-spacing: 2px;
 }
@@ -563,7 +605,7 @@ onBeforeUnmount(() => {
   margin-bottom: 18px;
 }
 .section-title {
-  font: bold 11px 'Cinzel', serif;
+  font: bold 11px "Cinzel", serif;
   letter-spacing: 3px;
   color: #6d5a48;
   border-bottom: 1px solid #c4a87a;
@@ -580,7 +622,7 @@ onBeforeUnmount(() => {
   border: 1px solid #c4a87a;
   padding: 6px 10px;
   margin-bottom: 8px;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 12px;
   border-radius: 4px;
 }
@@ -606,14 +648,16 @@ onBeforeUnmount(() => {
   border-color: #8b7355;
   opacity: 1;
 }
-.filter-item input { display: none; }
+.filter-item input {
+  display: none;
+}
 .filter-item img {
   width: 20px;
   height: 20px;
   object-fit: contain;
 }
 .filter-item span {
-  font: 11px 'Cinzel', serif;
+  font: 11px "Cinzel", serif;
   letter-spacing: 1px;
 }
 .filter-btns {
@@ -627,7 +671,7 @@ onBeforeUnmount(() => {
   color: #6d5a48;
   border: 1px solid #c4a87a;
   border-radius: 4px;
-  font: bold 9px 'Cinzel', serif;
+  font: bold 9px "Cinzel", serif;
   letter-spacing: 2px;
   cursor: pointer;
 }
@@ -635,7 +679,7 @@ onBeforeUnmount(() => {
   background: rgba(139, 115, 85, 0.25);
 }
 .type-label {
-  font: 11px 'Cinzel', serif;
+  font: 11px "Cinzel", serif;
   color: #6d5a48;
   letter-spacing: 2px;
   margin-bottom: 6px;
@@ -674,7 +718,7 @@ onBeforeUnmount(() => {
   color: #3e2f23;
   border: 1px solid #c4a87a;
   border-radius: 4px;
-  font: 13px 'Crimson Text', serif;
+  font: 13px "Crimson Text", serif;
   margin-bottom: 6px;
 }
 .form-btns {
@@ -689,7 +733,7 @@ onBeforeUnmount(() => {
   color: #ffeedd;
   border: none;
   border-radius: 4px;
-  font: bold 11px 'Cinzel', serif;
+  font: bold 11px "Cinzel", serif;
   cursor: pointer;
 }
 .btn-cancel {
@@ -699,7 +743,7 @@ onBeforeUnmount(() => {
   color: #8b7355;
   border: 1px solid #c4a87a;
   border-radius: 4px;
-  font: bold 11px 'Cinzel', serif;
+  font: bold 11px "Cinzel", serif;
   cursor: pointer;
 }
 .marker-list {
@@ -763,10 +807,16 @@ onBeforeUnmount(() => {
   color: #e8dcc8;
   padding: 10px 24px;
   border-radius: 4px;
-  font: bold 12px 'Cinzel', serif;
+  font: bold 12px "Cinzel", serif;
 }
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 
 /* Дополнительная адаптация под горизонтальную ориентацию на мобильных */
 @media (orientation: landscape) and (max-width: 768px) {
@@ -812,14 +862,14 @@ onBeforeUnmount(() => {
   border: 1px solid #8b7355;
   border-radius: 4px;
   padding: 8px 14px;
-  font-family: 'Crimson Text', serif;
+  font-family: "Crimson Text", serif;
   font-size: 13px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 .custom-tooltip b {
   display: block;
   margin-bottom: 3px;
-  font-family: 'Cinzel', serif;
+  font-family: "Cinzel", serif;
   font-size: 12px;
   letter-spacing: 1px;
   color: #ffeedd;
