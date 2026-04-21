@@ -168,6 +168,7 @@ const markerTypes = [
   { id: "snake", name: "Змея", icon: BASE + "snake.png" },
   { id: "eleph", name: "Мамонт", icon: BASE + "eleph.png" },
   { id: "gig", name: "Великан", icon: BASE + "gig.png" },
+  { id: "bird", name: "Фазан", icon: BASE + "bird.png" },
 ];
 
 const editMode = ref(false);
