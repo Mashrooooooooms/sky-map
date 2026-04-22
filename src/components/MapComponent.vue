@@ -12,6 +12,8 @@
     ☰
   </button>
 
+  <div class="flex">
+
   <!-- Кнопка переключения режима (десктоп) -->
   <button
     v-if="!isMobile"
@@ -21,6 +23,11 @@
   >
     {{ editMode ? "🏹 Расставляем" : "👁️ Смотрим" }}
   </button>
+
+<button v-if="!isMobile" class="mode-btn" :class="{ active: editMode }" @click="openAccountingBook" style="top: 66px;">📋 Книга учета</button>
+
+  </div>
+
 
   <!-- Переключатель слоёв (десктоп) -->
   <div v-if="!isMobile" class="layer-switch">
@@ -143,6 +150,11 @@
     :edit-mode="editMode && !isMobile"
     @toast="handleAlchemyToast"
   />
+
+  <AccountingBook
+  :visible="showAccountingBook"
+  @close="showAccountingBook = false"
+/>
 </template>
 
 <script setup>
@@ -151,6 +163,15 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import AlchemyLayer from "./AlchemyLayer.vue";
 import AddMarkerModal from "./AddMarkerModal.vue";
+import AccountingBook from "./AccountingBook.vue";
+
+const showAccountingBook = ref(false);
+
+function openAccountingBook() {
+  console.log("openAccountingBook called, showAccountingBook =", showAccountingBook.value);
+  showAccountingBook.value = true;
+  console.log("after set, showAccountingBook =", showAccountingBook.value);
+}
 
 const BASE = import.meta.env.BASE_URL;
 const WEB_APP_URL =
@@ -737,5 +758,10 @@ onBeforeUnmount(() => {
 }
 .layer-switch-mobile button.active {
   background: #8b2500;
+}
+
+.flex {
+  display: flex;
+  flex-direction: column;
 }
 </style>
