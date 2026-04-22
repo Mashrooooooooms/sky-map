@@ -1,6 +1,9 @@
 import './assets/main.css'
 
-import { createApp } from 'vue'
-import App from './App.vue'
+import { createApp } from 'vue';
+import App from './App.vue';
+import VueApexCharts from 'vue3-apexcharts';
 
-createApp(App).mount('#app')
+const app = createApp(App);
+app.component('apexchart', VueApexCharts);   // глобальная регистрация
+app.mount('#app');

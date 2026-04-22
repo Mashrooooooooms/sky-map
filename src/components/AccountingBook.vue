@@ -16,9 +16,12 @@
           <div class="tab-bar">
             <button :class="{ active: activeTab === 'stock' }" @click="activeTab = 'stock'">📦 Склад</button>
             <button :class="{ active: activeTab === 'treasury' }" @click="activeTab = 'treasury'">💰 Казна</button>
+            <button :class="{ active: activeTab === 'chart' }" @click="activeTab = 'chart'">📊 График продаж</button>
           </div>
-          <!-- Склад -->
+
+          <!-- Склад (без изменений) -->
           <div v-if="activeTab === 'stock'" class="stock-tab">
+            <!-- ... содержимое как было ... -->
             <div class="add-item-form">
               <div class="form-title">➕ Добавить предмет на склад</div>
               <div class="form-row">
@@ -43,13 +46,14 @@
                   <td>
                     <button class="sell-btn" @click="openSellDialog(item)">💰 Продать</button>
                     <button class="remove-btn" @click="openRemoveDialog(item)">🗑️ Удалить</button>
-                   </td>
+                  </td>
                 </tr>
                 <tr v-if="filteredStock.length === 0"><td colspan="6" class="empty-row">Нет записей</td></tr>
               </tbody>
-             </table>
+              </table>
             </div>
           </div>
+
           <!-- Казна (без изменений) -->
           <div v-if="activeTab === 'treasury'" class="treasury-tab">
             <div class="treasury-summary"><div class="total-sum-label">Текущий баланс казны</div><div class="total-sum-value">{{ treasury.total }}</div></div>
@@ -61,6 +65,17 @@
             <div class="history-table-container"><table class="history-table"><thead><tr><th>Дата</th><th>Тип</th><th>Сумма</th><th>Комментарий</th></tr></thead>
             <tbody><tr v-for="op in treasury.history.slice().reverse().slice(0,20)" :key="op.date + op.amount + op.note"><td class="history-date">{{ op.date }}</td><td><span :class="op.type === 'income' ? 'badge-income' : 'badge-expense'">{{ op.type === 'income' ? 'Пополнение' : 'Расход' }}</span></td><td :class="op.type === 'income' ? 'amount-income' : 'amount-expense'">{{ op.type === 'income' ? '+' : '-' }}{{ op.amount }}</td><td class="history-note">{{ op.note || '—' }}</td></tr>
             <tr v-if="treasury.history.length === 0"><td colspan="4" class="empty-row">Нет операций</td></tr></tbody></table></div>
+          </div>
+
+          <!-- График продаж (новая вкладка) -->
+          <div v-if="activeTab === 'chart'" class="chart-tab">
+            <div class="section-title-small">📊 Количество проданных единиц по предметам</div>
+            <div v-if="chartData.series.length === 0" class="empty-chart">
+              Нет данных о продажах
+            </div>
+            <div v-else class="chart-container">
+              <apexchart type="pie" :options="chartOptions" :series="chartData.series"></apexchart>
+            </div>
           </div>
         </div>
       </div>
@@ -102,10 +117,15 @@
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import VueApexCharts from 'vue3-apexcharts';
+const ApexChart = VueApexCharts;
+
 const props = defineProps({ visible: Boolean });
 const emit = defineEmits(['close']);
-const API_URL = 'https://script.google.com/macros/s/AKfycbxv7Nc8ZWsrKvqCwbTyOsreYDHA1PuaNs628RJgavzYhpHJ6dApK8vcA5MlozEMd2GW-Q/exec';
+
+const API_URL = 'https://script.google.com/macros/s/AKfycbzbemALUDRPUjW4BLIw3IwxRLv8bnuaUNvHEuOoCJJwGhV8okebtRaebd0rDRHE8LdCRA/exec';
 const PASSWORD = 'fkmrYgld';
+
 const authenticated = ref(false);
 const password = ref('');
 const errorMsg = ref('');
@@ -127,6 +147,66 @@ let autoUpdateInterval = null;
 const sellDialog = ref({ visible: false, itemId: null, itemName: '', maxQuantity: 0, quantity: 1, amount: 0, error: '', loading: false });
 const removeDialog = ref({ visible: false, itemId: null, itemName: '', maxQuantity: 0, quantity: 1, error: '', loading: false });
 
+// Данные для графика
+const chartData = computed(() => {
+  // Фильтруем предметы с sold_qty > 0
+  const itemsWithSales = stockItems.value.filter(item => item.sold_qty && item.sold_qty > 0);
+  const series = itemsWithSales.map(item => item.sold_qty);
+  const labels = itemsWithSales.map(item => item.name);
+  return { series, labels };
+});
+
+const chartOptions = computed(() => ({
+  chart: {
+    width: '350px',
+    height: '350px',
+    type: 'pie',
+    background: 'transparent',
+    toolbar: { show: false }
+  },
+  labels: chartData.value.labels,
+  colors: ['#8b2500', '#6b1c00', '#5c3a1e', '#4a2e18', '#7a3a1a', '#9a4a2a', '#3e2a1a', '#8b5a3a'],
+  theme: { mode: 'dark' },
+  tooltip: {
+    enabled: true,
+    theme: 'dark',
+    style: { fontSize: '12px', fontFamily: 'Cinzel, serif' },
+    y: { formatter: (val) => `${val} шт.` }
+  },
+  legend: {
+    position: 'bottom',
+    labels: { colors: '#e8dcc8', fontFamily: 'Cinzel, serif', fontSize: '11px' },
+    itemMargin: { horizontal: 8, vertical: 4 }
+  },
+  dataLabels: {
+    enabled: true,
+    style: {
+      colors: ['#ffffff'],           // белый текст
+      fontSize: '13px',              // крупнее
+      fontFamily: 'Cinzel, serif',
+      fontWeight: 'bold'
+    },
+    formatter: (val, opts) => `${opts.w.config.series[opts.seriesIndex]} шт.`,
+    dropShadow: {                    // тень для читаемости на тёмных секторах
+      enabled: true,
+      top: 1,
+      left: 1,
+      blur: 2,
+      color: '#000',
+      opacity: 0.5
+    }
+  },
+  responsive: [{
+    breakpoint: 480,
+    options: {
+      chart: { width: '280px', height: '280px' },
+      legend: { position: 'bottom' },
+      dataLabels: { style: { fontSize: '11px' } }
+    }
+  }]
+}));
+
+// API вызовы (без изменений)
 async function callApi(action, body = {}) {
   let url = API_URL;
   if (!action) {
@@ -270,7 +350,7 @@ const filteredStock = computed(() => {
 </script>
 
 <style scoped>
-/* Все предыдущие стили + добавить для кнопки удаления */
+/* Все стили из предыдущей версии + добавить для графика */
 .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);backdrop-filter:blur(5px);z-index:10000;display:flex;align-items:center;justify-content:center;}
 .modal-container{width:90%;max-width:900px;max-height:85vh;background:linear-gradient(135deg,#1e1a16,#2a241f);border-radius:12px;border:2px solid #8b7355;display:flex;flex-direction:column;overflow:hidden;color:#f0e6d0;font-family:'Crimson Text',serif;position:relative;}
 .accounting-modal *{color:#f0e6d0;}
@@ -352,4 +432,33 @@ const filteredStock = computed(() => {
 .sell-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:12px;}
 .sell-loading .spinner{width:32px;height:32px;border:3px solid #e8dcc8;border-top:3px solid #8b2500;border-radius:50%;animation:spin 1s linear infinite;}
 .sell-loading .loading-text{font-family:'Cinzel',serif;font-size:14px;color:#e8dcc8;}
+.chart-tab{padding: 10px 0;}
+.chart-container{background: rgba(0,0,0,0.3); border-radius: 12px; padding: 16px; margin-top: 8px;}
+.empty-chart{text-align:center; padding: 40px; color: #b8a88a; font-family: 'Cinzel', serif;}
+.chart-container {
+  background: rgba(0,0,0,0.3);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+:deep(.apexcharts-tooltip) {
+  background: #2a241f !important;
+  border: 1px solid #8b7355 !important;
+  border-radius: 8px !important;
+  color: #ffffff !important;
+  font-family: 'Cinzel', serif !important;
+}
+:deep(.apexcharts-tooltip-title) {
+  background: #1e1a16 !important;
+  border-bottom: 1px solid #8b7355 !important;
+  color: #ffffff !important;
+}
+:deep(.apexcharts-tooltip-text-y-label),
+:deep(.apexcharts-tooltip-text-y-value) {
+  color: #ffffff !important;
+}
 </style>
