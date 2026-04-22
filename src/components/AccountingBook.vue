@@ -236,13 +236,27 @@ async function fetchAccountingData() {
   finally { isLoading.value = false; }
 }
 async function addStockItem() {
-  if (!newItem.value.type || !newItem.value.name || !newItem.value.quantity) { alert('Заполните тип, название и количество'); return; }
+  if (!newItem.value.type || !newItem.value.name || !newItem.value.quantity) {
+    alert('Заполните тип, название и количество');
+    return;
+  }
   isLoading.value = true;
   try {
-    await callApi('addStock', { type: newItem.value.type, name: newItem.value.name, quantity: newItem.value.quantity, score: 0, player: 'Неизвестно' });
+    await callApi('addStock', { 
+      type: newItem.value.type, 
+      name: newItem.value.name, 
+      quantity: newItem.value.quantity, 
+      score: 0, 
+      player: 'Неизвестно' 
+    });
     await fetchAccountingData();
-    newItem.value = { type: '', name: '', quantity: 1 };
-  } catch (err) { alert('Ошибка: ' + err.message); } finally { isLoading.value = false; }
+    // Сохраняем последний выбранный тип, сбрасываем только название и количество
+    newItem.value = { type: newItem.value.type, name: '', quantity: 1 };
+  } catch (err) { 
+    alert('Ошибка: ' + err.message); 
+  } finally { 
+    isLoading.value = false; 
+  }
 }
 async function addIncome() {
   if (!incomeAmount.value || incomeAmount.value <= 0) return;
