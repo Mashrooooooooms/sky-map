@@ -123,7 +123,7 @@ const ApexChart = VueApexCharts;
 const props = defineProps({ visible: Boolean });
 const emit = defineEmits(['close']);
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbzbemALUDRPUjW4BLIw3IwxRLv8bnuaUNvHEuOoCJJwGhV8okebtRaebd0rDRHE8LdCRA/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzpt6QII0qaENioQXWCwCpEW5b78qFLqKkH1nkUo5AYbI-97ylOztf6uE3lwFYQ09VioA/exec';
 const PASSWORD = 'fkmrYgld';
 
 const authenticated = ref(false);
