@@ -19,9 +19,8 @@
             <button :class="{ active: activeTab === 'chart' }" @click="activeTab = 'chart'">📊 График продаж</button>
           </div>
 
-          <!-- Склад (без изменений) -->
+          <!-- Склад -->
           <div v-if="activeTab === 'stock'" class="stock-tab">
-            <!-- ... содержимое как было ... -->
             <div class="add-item-form">
               <div class="form-title">➕ Добавить предмет на склад</div>
               <div class="form-row">
@@ -44,8 +43,10 @@
                   <td>{{ item.quantity }}</td>
                   <td>{{ item.date }}</td>
                   <td>
+                    <button class="plus-btn" @click="openIncreaseDialog(item)">➕</button>
+                    <button class="minus-btn" @click="openDecreaseDialog(item)">➖</button>
                     <button class="sell-btn" @click="openSellDialog(item)">💰 Продать</button>
-                    <button class="remove-btn" @click="openRemoveDialog(item)">🗑️ Удалить</button>
+
                   </td>
                 </tr>
                 <tr v-if="filteredStock.length === 0"><td colspan="6" class="empty-row">Нет записей</td></tr>
@@ -54,7 +55,7 @@
             </div>
           </div>
 
-          <!-- Казна (без изменений) -->
+          <!-- Казна -->
           <div v-if="activeTab === 'treasury'" class="treasury-tab">
             <div class="treasury-summary"><div class="total-sum-label">Текущий баланс казны</div><div class="total-sum-value">{{ treasury.total }}</div></div>
             <div class="treasury-actions">
@@ -67,7 +68,7 @@
             <tr v-if="treasury.history.length === 0"><td colspan="4" class="empty-row">Нет операций</td></tr></tbody></table></div>
           </div>
 
-          <!-- График продаж (новая вкладка) -->
+          <!-- График продаж -->
           <div v-if="activeTab === 'chart'" class="chart-tab">
             <div class="section-title-small">📊 Количество проданных единиц по предметам</div>
             <div v-if="chartData.series.length === 0" class="empty-chart">
@@ -112,6 +113,36 @@
         <div class="sell-footer" v-if="!removeDialog.loading"><button @click="closeRemoveDialog" class="btn-cancel">Отмена</button><button @click="confirmRemove" class="btn-remove">🗑️ Подтвердить удаление</button></div>
       </div>
     </div>
+
+    <!-- Модалка увеличения (+) -->
+    <div v-if="increaseDialog.visible" class="modal-overlay nested" @click.self="closeIncreaseDialog">
+      <div class="sell-modal">
+        <div class="sell-header">📈 Увеличить: {{ increaseDialog.itemName }}</div>
+        <div class="sell-body">
+          <div v-if="!increaseDialog.loading">
+            <div class="sell-field"><label>Количество для добавления:</label><input type="number" v-model.number="increaseDialog.quantity" min="1" /></div>
+            <div class="sell-error" v-if="increaseDialog.error">{{ increaseDialog.error }}</div>
+          </div>
+          <div v-else class="sell-loading"><div class="spinner"></div><div class="loading-text">Добавление...</div></div>
+        </div>
+        <div class="sell-footer" v-if="!increaseDialog.loading"><button @click="closeIncreaseDialog" class="btn-cancel">Отмена</button><button @click="confirmIncrease" class="btn-sell">✅ Добавить</button></div>
+      </div>
+    </div>
+
+    <!-- Модалка уменьшения (-) -->
+    <div v-if="decreaseDialog.visible" class="modal-overlay nested" @click.self="closeDecreaseDialog">
+      <div class="sell-modal">
+        <div class="sell-header">📉 Уменьшить: {{ decreaseDialog.itemName }}</div>
+        <div class="sell-body">
+          <div v-if="!decreaseDialog.loading">
+            <div class="sell-field"><label>Количество для списания (макс. {{ decreaseDialog.maxQuantity }}):</label><input type="number" v-model.number="decreaseDialog.quantity" :max="decreaseDialog.maxQuantity" min="1" /></div>
+            <div class="sell-error" v-if="decreaseDialog.error">{{ decreaseDialog.error }}</div>
+          </div>
+          <div v-else class="sell-loading"><div class="spinner"></div><div class="loading-text">Списание...</div></div>
+        </div>
+        <div class="sell-footer" v-if="!decreaseDialog.loading"><button @click="closeDecreaseDialog" class="btn-cancel">Отмена</button><button @click="confirmDecrease" class="btn-remove">➖ Списать</button></div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -146,10 +177,11 @@ let autoUpdateInterval = null;
 // Диалоги
 const sellDialog = ref({ visible: false, itemId: null, itemName: '', maxQuantity: 0, quantity: 1, amount: 0, error: '', loading: false });
 const removeDialog = ref({ visible: false, itemId: null, itemName: '', maxQuantity: 0, quantity: 1, error: '', loading: false });
+const increaseDialog = ref({ visible: false, itemId: null, itemName: '', itemType: '', itemPlayer: '', quantity: 1, error: '', loading: false });
+const decreaseDialog = ref({ visible: false, itemId: null, itemName: '', maxQuantity: 0, quantity: 1, error: '', loading: false });
 
 // Данные для графика
 const chartData = computed(() => {
-  // Фильтруем предметы с sold_qty > 0
   const itemsWithSales = stockItems.value.filter(item => item.sold_qty && item.sold_qty > 0);
   const series = itemsWithSales.map(item => item.sold_qty);
   const labels = itemsWithSales.map(item => item.name);
@@ -181,13 +213,13 @@ const chartOptions = computed(() => ({
   dataLabels: {
     enabled: true,
     style: {
-      colors: ['#ffffff'],           // белый текст
-      fontSize: '13px',              // крупнее
+      colors: ['#ffffff'],
+      fontSize: '13px',
       fontFamily: 'Cinzel, serif',
       fontWeight: 'bold'
     },
     formatter: (val, opts) => `${opts.w.config.series[opts.seriesIndex]} шт.`,
-    dropShadow: {                    // тень для читаемости на тёмных секторах
+    dropShadow: {
       enabled: true,
       top: 1,
       left: 1,
@@ -206,7 +238,7 @@ const chartOptions = computed(() => ({
   }]
 }));
 
-// API вызовы (без изменений)
+// API вызовы
 async function callApi(action, body = {}) {
   let url = API_URL;
   if (!action) {
@@ -250,7 +282,6 @@ async function addStockItem() {
       player: 'Неизвестно' 
     });
     await fetchAccountingData();
-    // Сохраняем последний выбранный тип, сбрасываем только название и количество
     newItem.value = { type: newItem.value.type, name: '', quantity: 1 };
   } catch (err) { 
     alert('Ошибка: ' + err.message); 
@@ -341,12 +372,89 @@ async function confirmRemove() {
     removeDialog.value.loading = false;
   }
 }
+// Увеличение (+)
+function openIncreaseDialog(item) {
+  increaseDialog.value = {
+    visible: true,
+    itemId: item.id,
+    itemName: item.name,
+    itemType: item.tape,
+    itemPlayer: item.player || 'Неизвестно',
+    quantity: 1,
+    error: '',
+    loading: false
+  };
+}
+function closeIncreaseDialog() {
+  increaseDialog.value.visible = false;
+  increaseDialog.value.loading = false;
+  increaseDialog.value.error = '';
+}
+async function confirmIncrease() {
+  const qty = increaseDialog.value.quantity;
+  if (!qty || qty < 1) {
+    increaseDialog.value.error = 'Введите положительное число';
+    return;
+  }
+  increaseDialog.value.loading = true;
+  increaseDialog.value.error = '';
+  try {
+    await callApi('addStock', {
+      type: increaseDialog.value.itemType,
+      name: increaseDialog.value.itemName,
+      quantity: qty,
+      score: 0,
+      player: increaseDialog.value.itemPlayer
+    });
+    await fetchAccountingData();
+    closeIncreaseDialog();
+  } catch (err) {
+    increaseDialog.value.error = err.message;
+    increaseDialog.value.loading = false;
+  }
+}
+// Уменьшение (-)
+function openDecreaseDialog(item) {
+  decreaseDialog.value = {
+    visible: true,
+    itemId: item.id,
+    itemName: item.name,
+    maxQuantity: item.quantity,
+    quantity: 1,
+    error: '',
+    loading: false
+  };
+}
+function closeDecreaseDialog() {
+  decreaseDialog.value.visible = false;
+  decreaseDialog.value.loading = false;
+  decreaseDialog.value.error = '';
+}
+async function confirmDecrease() {
+  const qty = decreaseDialog.value.quantity;
+  if (!qty || qty < 1 || qty > decreaseDialog.value.maxQuantity) {
+    decreaseDialog.value.error = `Введите количество от 1 до ${decreaseDialog.value.maxQuantity}`;
+    return;
+  }
+  decreaseDialog.value.loading = true;
+  decreaseDialog.value.error = '';
+  try {
+    await callApi('removeItem', { id: decreaseDialog.value.itemId, quantity: qty });
+    await fetchAccountingData();
+    closeDecreaseDialog();
+  } catch (err) {
+    decreaseDialog.value.error = err.message;
+    decreaseDialog.value.loading = false;
+  }
+}
 watch(() => props.visible, (newVal) => {
   if (!newVal) {
     authenticated.value = false; password.value = ''; errorMsg.value = ''; activeTab.value = 'stock'; stockSearch.value = ''; activeTypeFilter.value = '';
     if (autoUpdateInterval) { clearInterval(autoUpdateInterval); autoUpdateInterval = null; }
     closeSellDialog();
     closeRemoveDialog();
+    closeIncreaseDialog();
+    closeDecreaseDialog();
   } else { authenticated.value = false; password.value = ''; errorMsg.value = ''; }
 });
 onBeforeUnmount(() => { if (autoUpdateInterval) clearInterval(autoUpdateInterval); });
@@ -364,7 +472,6 @@ const filteredStock = computed(() => {
 </script>
 
 <style scoped>
-/* Все стили из предыдущей версии + добавить для графика */
 .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);backdrop-filter:blur(5px);z-index:10000;display:flex;align-items:center;justify-content:center;}
 .modal-container{width:90%;max-width:900px;max-height:85vh;background:linear-gradient(135deg,#1e1a16,#2a241f);border-radius:12px;border:2px solid #8b7355;display:flex;flex-direction:column;overflow:hidden;color:#f0e6d0;font-family:'Crimson Text',serif;position:relative;}
 .accounting-modal *{color:#f0e6d0;}
@@ -432,6 +539,27 @@ const filteredStock = computed(() => {
 .sell-btn:hover,.remove-btn:hover{background:#a54a38;}
 .remove-btn{background:#5c4a3a;margin-left:8px;}
 .remove-btn:hover{background:#7a6248;}
+/* Новые кнопки +/- */
+.plus-btn, .minus-btn {
+  background: #3a5a3a;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  color: white;
+  cursor: pointer;
+  font-family: 'Cinzel', serif;
+  font-size: 14px;
+  margin-right: 4px;
+}
+.plus-btn:hover {
+  background: #4a7a4a;
+}
+.minus-btn {
+  background: #7a4a3a;
+}
+.minus-btn:hover {
+  background: #9a5a4a;
+}
 .modal-overlay.nested{background:rgba(0,0,0,0.7);backdrop-filter:blur(2px);z-index:10001;}
 .sell-modal{background:#2a241f;border:2px solid #8b7355;border-radius:12px;width:320px;max-width:90%;padding:20px;font-family:'Cinzel',serif;}
 .sell-header{font-size:18px;font-weight:bold;margin-bottom:16px;color:#e8a870;text-align:center;}
