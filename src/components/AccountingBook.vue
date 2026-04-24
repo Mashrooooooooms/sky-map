@@ -1001,18 +1001,54 @@ const filteredStock = computed(() => {
   background: #3a2e26;
 }
 
-/* Массовая модалка */
-.batch-modal { width: 600px; max-width: 90%; }
-.batch-table { width: 100%; margin-top: 12px; }
+/* Массовая модалка – фикс растягивания */
+.batch-modal { 
+  width: 600px; 
+  max-width: 90%;
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh; /* общая максимальная высота модалки */
+}
+.batch-modal .sell-body {
+  flex: 1;               /* занимает доступное пространство */
+  overflow-y: auto;      /* прокрутка только здесь */
+  padding-right: 6px;    /* чтобы скролл не наезжал на контент */
+  margin-bottom: 0;      /* отключаем стандартный отступ */
+}
+.batch-table { 
+  width: 100%; 
+  display: flex;
+  flex-direction: column;
+}
 .batch-header, .batch-row {
   display: flex;
   gap: 8px;
   margin-bottom: 8px;
   align-items: center;
 }
-.batch-header { font-weight: bold; font-size: 12px; color: #e8c8a0; margin-bottom: 12px; }
+.batch-header { font-weight: bold; font-size: 12px; color: #e8c8a0; margin-bottom: 12px; flex-shrink: 0; }
 .batch-col { flex: 1; min-width: 0; }
 .batch-col select, .batch-col input { width: 100%; padding: 6px; background: #1e1a16; border: 1px solid #5c4a3a; border-radius: 4px; color: #f0e6d0; }
-.remove-row-btn { background: #8b3a2a; border: none; border-radius: 4px; color: white; width: 28px; height: 28px; cursor: pointer; }
-.add-row-btn { margin-top: 12px; background: #3a5a3a; border: none; padding: 6px 12px; border-radius: 4px; color: white; cursor: pointer; }
+.remove-row-btn { background: #8b3a2a; border: none; border-radius: 4px; color: white; width: 28px; height: 28px; cursor: pointer; flex-shrink: 0; }
+.add-row-btn { 
+  margin-top: 12px; 
+  background: #3a5a3a; 
+  border: none; 
+  padding: 6px 12px; 
+  border-radius: 4px; 
+  color: white; 
+  cursor: pointer; 
+  flex-shrink: 0;
+}
+/* Заголовок и кнопки остаются на месте, строки внутри batch-table прокручиваются */
+.batch-table .batch-header,
+.batch-table .add-row-btn {
+  position: sticky;
+  background: #2a241f; /* фон как у модалки */
+  z-index: 2;
+}
+.batch-table .batch-header { top: 0; }
+.batch-table .add-row-btn { bottom: 0; margin-top: 8px; }
+/* Строки партии (внутри повторяющегося v-for) */
+.batch-row { flex-shrink: 0; }
 </style>
